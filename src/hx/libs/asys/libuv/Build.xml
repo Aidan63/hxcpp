@@ -149,26 +149,26 @@
         <file name='${this_dir}/BaseData.cpp'/>
         <file name='${this_dir}/LibuvAsysContext.cpp'/>
         <file name='${this_dir}/LibuvUtils.cpp'/>
-        <file name='${this_dir}/net/LibuvDns.cpp'/>
+        <!--<file name='${this_dir}/net/LibuvDns.cpp'/>
         <file name='${this_dir}/net/LibuvIp.cpp'/>
         <file name='${this_dir}/net/LibuvTcpSocket.cpp'/>
         <file name='${this_dir}/net/LibuvTcpServer.cpp'/>
         <file name='${this_dir}/net/LibuvIpcSocket.cpp'/>
         <file name='${this_dir}/net/NetUtils.cpp'/>
         <file name='${this_dir}/stream/StreamWriter.cpp'/>
-        <file name='${this_dir}/stream/StreamReader.cpp'/>
+        <file name='${this_dir}/stream/StreamReader.cpp'/>-->
         <file name='${this_dir}/filesystem/LibuvFile.cpp'/>
-        <file name='${this_dir}/filesystem/LibuvDirectory.cpp'/>
+        <!--<file name='${this_dir}/filesystem/LibuvDirectory.cpp'/>
         <file name='${this_dir}/system/LibuvProcess.cpp'/>
         <file name='${this_dir}/system/LibuvChildProcess.cpp'/>
-        <file name='${this_dir}/system/LibuvCurrentProcess.cpp'/>
+        <file name='${this_dir}/system/LibuvCurrentProcess.cpp'/>-->
     </files>
 
     <files id='schannel'>
         <depend name="${this_dir}/Build.xml" dateOnly="true"/>
         <cache value='true' asLibrary='true'/>
 
-        <file name='${this_dir}/net/schannel/SChannelSecureSession.cpp'/>
+        <!--<file name='${this_dir}/net/schannel/SChannelSecureSession.cpp'/>-->
     </files>
 
     <target id='haxe'>

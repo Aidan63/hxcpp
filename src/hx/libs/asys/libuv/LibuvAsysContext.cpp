@@ -1,77 +1,126 @@
 #include <hxcpp.h>
 #include <hx/asys/libuv/LibuvAsysContext.h>
 #include "BaseData.h"
-#include "system/LibuvCurrentProcess.h"
+//#include "system/LibuvCurrentProcess.h"
 
 #include <memory>
+#include <thread>
+
+namespace
+{
+    hx::asys::libuv::LibuvAsysContext_obj::Ctx* global = nullptr;
+    volatile int created = 0;
+}
 
 hx::asys::Context hx::asys::Context_obj::create()
 {
-    auto loop   = std::make_unique<uv_loop_t>();
-    auto result = uv_loop_init(loop.get());
-
-    if (result < 0)
+    if (nullptr == global)
     {
-        hx::Throw(String::create(uv_strerror(result)));
+        global = new libuv::LibuvAsysContext_obj::Ctx();
     }
 
-    auto current = std::make_unique<hx::asys::libuv::system::LibuvCurrentProcess::Ctx>(loop.get());
-
-    for (auto i = 0; i < current->ttys.size(); i++)
+    while (_hx_atomic_load(&created) == 0)
     {
-        if ((result = uv_tty_init(loop.get(), &current->ttys.at(i), i, false)) < 0)
+        // 
+    }
+
+    return Context(new hx::asys::libuv::LibuvAsysContext_obj(global));
+}
+
+hx::asys::libuv::LibuvAsysContext_obj::Ctx::Ctx()
+    : loop()
+    , serialised()
+    , ttys()
+    // , reader(reinterpret_cast<uv_stream_t*>(&ttys.at(0)))
+    , lock()
+    , queue()
+    , thread(&hx::asys::libuv::LibuvAsysContext_obj::Ctx::run, this)
+{
+    loop.data = this;
+    serialised.data = this;
+}
+
+void hx::asys::libuv::LibuvAsysContext_obj::Ctx::run()
+{
+    HX_TOP_OF_STACK;
+
+    auto result = int{ 0 };
+
+    if ((result = uv_loop_init(&loop) < 0))
+    {
+        hx::CriticalError(String::create(uv_strerror(result)));
+    }
+    if ((result = uv_async_init(&loop, &serialised, consume) < 0))
+    {
+        hx::CriticalError(String::create(uv_strerror(result)));
+    }
+    for (auto i = 0; i < ttys.size(); i++)
+    {
+        if ((result = uv_tty_init(&loop, &ttys.at(i), i, false)) < 0)
         {
-            hx::Throw(HX_CSTRING("Failed to init tty : ") + hx::asys::libuv::uv_err_to_enum(result)->GetEnumName());
+            hx::CriticalError(String::create(uv_strerror(result)));
         }
     }
 
-    return
-        Context(
-            new libuv::LibuvAsysContext_obj(
-                loop.release(),
-                hx::asys::system::CurrentProcess(new hx::asys::libuv::system::LibuvCurrentProcess(current.release()))));
+    _hx_atomic_store(&created, 1);
+
+    hx::EnterGCFreeZone();
+
+    if (uv_run(&loop, UV_RUN_DEFAULT) > 0)
+    {
+        // Cleanup the loop according to https://stackoverflow.com/a/25831688
+        uv_walk(
+            &loop,
+            [](uv_handle_t* handle, void*) {
+                uv_close(handle, nullptr);
+            },
+            nullptr);
+
+        if (uv_run(&loop, UV_RUN_DEFAULT) > 0)
+        {
+            hx::ExitGCFreeZone();
+            hx::CriticalError(String::create("Failed to remove all active handles"));
+        }
+    }
+
+    if ((result = uv_loop_close(&loop)) < 0)
+    {
+        hx::ExitGCFreeZone();
+        hx::CriticalError(String::create(uv_strerror(result)));
+    }
+
+    hx::ExitGCFreeZone();
 }
 
-hx::asys::libuv::LibuvAsysContext_obj::LibuvAsysContext_obj(uv_loop_t* _uvLoop, hx::asys::system::CurrentProcess _process)
-    : hx::asys::Context_obj(_process)
-    , uvLoop(_uvLoop) {}
-
-bool hx::asys::libuv::LibuvAsysContext_obj::loop()
+void hx::asys::libuv::LibuvAsysContext_obj::Ctx::consume(uv_async_t* async)
 {
-    auto freeZone = AutoGCFreeZone();
-    auto result   = uv_run(uvLoop, UV_RUN_NOWAIT);
+    auto ctx   = static_cast<Ctx*>(async->data);
+    auto guard = std::lock_guard(ctx->lock);
+    auto gc    = AutoGCZone();
 
+    while (ctx->queue.empty() == false)
+    {
+        auto work = ctx->queue.front().release();
+
+        work->run(&ctx->loop);
+
+        ctx->queue.pop_front();
+    }
+}
+
+hx::asys::libuv::LibuvAsysContext_obj::LibuvAsysContext_obj(Ctx* _ctx /*, hx::asys::system::CurrentProcess _process */)
+    // : hx::asys::Context_obj()
+    : ctx(_ctx) {}
+
+void hx::asys::libuv::LibuvAsysContext_obj::enqueue(std::unique_ptr<hx::asys::libuv::BaseRequest> request)
+{
+    auto guard = std::lock_guard(ctx->lock);
+
+    ctx->queue.push_back(std::move(request));
+
+    auto result = uv_async_send(&ctx->serialised);
     if (result < 0)
     {
-        freeZone.close();
-
-        hx::Throw(String::create(uv_strerror(result)));
+        hx::CriticalError(String::create(uv_strerror(result)));
     }
-
-    return result > 0;
-}
-
-void hx::asys::libuv::LibuvAsysContext_obj::close()
-{
-    // Cleanup the loop according to https://stackoverflow.com/a/25831688
-
-    uv_stop(uvLoop);
-    uv_walk(
-        uvLoop,
-        [](uv_handle_t* handle, void*) {
-            uv_close(handle, hx::asys::libuv::clean_handle);
-        },
-        nullptr);
-
-    if (uv_run(uvLoop, uv_run_mode::UV_RUN_DEFAULT) < 0)
-    {
-        // TODO : what should be do if our run failed.
-    }
-
-    if (uv_loop_close(uvLoop) < 0)
-    {
-        // TODO : what should be do if there are still outstanding handles after trying to close them all.
-    }
-    
-    delete uvLoop;
 }

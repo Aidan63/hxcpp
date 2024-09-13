@@ -15,15 +15,6 @@ namespace hx::asys::libuv
 
     hx::EnumBase uv_err_to_enum(int code);
 
-    struct BaseRequest
-    {
-        hx::RootedObject<hx::Object> cbSuccess;
-        hx::RootedObject<hx::Object> cbFailure;
-
-        BaseRequest(Dynamic _cbSuccess, Dynamic _cbFailure);
-        virtual ~BaseRequest() = default;
-    };
-
     void basic_callback(uv_fs_t* request);
 
     void clean_handle(uv_handle_t* handle);
