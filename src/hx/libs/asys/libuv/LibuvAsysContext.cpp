@@ -100,7 +100,7 @@ void hx::asys::libuv::LibuvAsysContext_obj::Ctx::consume(uv_async_t* async)
 
     while (ctx->queue.empty() == false)
     {
-        auto work = ctx->queue.front().release();
+        auto& work = ctx->queue.front();
 
         work->run(&ctx->loop);
 
@@ -108,19 +108,19 @@ void hx::asys::libuv::LibuvAsysContext_obj::Ctx::consume(uv_async_t* async)
     }
 }
 
-hx::asys::libuv::LibuvAsysContext_obj::LibuvAsysContext_obj(Ctx* _ctx /*, hx::asys::system::CurrentProcess _process */)
-    // : hx::asys::Context_obj()
-    : ctx(_ctx) {}
-
-void hx::asys::libuv::LibuvAsysContext_obj::enqueue(std::unique_ptr<hx::asys::libuv::BaseRequest> request)
+void hx::asys::libuv::LibuvAsysContext_obj::Ctx::enqueue(std::unique_ptr<WorkRequest> request)
 {
-    auto guard = std::lock_guard(ctx->lock);
+    auto guard = std::lock_guard(lock);
 
-    ctx->queue.push_back(std::move(request));
+    queue.push_back(std::move(request));
 
-    auto result = uv_async_send(&ctx->serialised);
+    auto result = uv_async_send(&serialised);
     if (result < 0)
     {
         hx::CriticalError(String::create(uv_strerror(result)));
     }
 }
+
+hx::asys::libuv::LibuvAsysContext_obj::LibuvAsysContext_obj(Ctx* _ctx /*, hx::asys::system::CurrentProcess _process */)
+    // : hx::asys::Context_obj()
+    : ctx(_ctx) {}

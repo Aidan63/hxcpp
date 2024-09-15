@@ -7,13 +7,13 @@ namespace hx::asys::libuv::filesystem
 {
     class LibuvFile_obj final : public hx::asys::filesystem::File_obj
     {
-    private:
-        hx::asys::libuv::LibuvAsysContext ctx;
+        uv_loop_t* loop;
+        bool closed;
 
     public:
         uv_file file;
 
-        LibuvFile_obj(hx::asys::libuv::LibuvAsysContext ctx, uv_file _file, const String _path);
+        LibuvFile_obj(uv_loop_t* _loop, uv_file _file, const String _path);
 
         void write(::cpp::Int64 pos, Array<uint8_t> data, int offset, int length, Dynamic cbSuccess, Dynamic cbFailure);
         //void read(::cpp::Int64 pos, Array<uint8_t> output, int offset, int length, Dynamic cbSuccess, Dynamic cbFailure);

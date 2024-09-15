@@ -7,6 +7,7 @@
 #include <mutex>
 #include <deque>
 #include <array>
+#include <functional>
 
 HX_DECLARE_CLASS3(hx, asys, libuv, LibuvAsysContext)
 
@@ -19,6 +20,11 @@ namespace hx::asys::libuv
 
         BaseRequest(Dynamic _cbSuccess, Dynamic _cbFailure);
         virtual ~BaseRequest() = default;
+    };
+
+    struct WorkRequest : public BaseRequest
+    {
+        WorkRequest(Dynamic _cbSuccess, Dynamic _cbFailure) : BaseRequest(_cbSuccess.mPtr, _cbFailure.mPtr) {}
 
         virtual void run(uv_loop_t* loop) = 0;
     };
@@ -34,18 +40,18 @@ namespace hx::asys::libuv
             //hx::asys::libuv::stream::StreamReader_obj::Ctx reader;
             std::thread thread;
             std::mutex lock;
-            std::deque<std::unique_ptr<hx::asys::libuv::BaseRequest>> queue;
-
-            void run();
-            static void consume(uv_async_t*);
+            std::deque<std::unique_ptr<WorkRequest>> queue;
 
             Ctx();
+
+            void enqueue(std::unique_ptr<WorkRequest> request);
+            void run();
+
+            static void consume(uv_async_t*);
         };
 
         Ctx* ctx;
 
         LibuvAsysContext_obj(Ctx* ctx);
-
-        void enqueue(std::unique_ptr<hx::asys::libuv::BaseRequest> request);
     };
 }

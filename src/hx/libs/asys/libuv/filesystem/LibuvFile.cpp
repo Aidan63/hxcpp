@@ -8,41 +8,6 @@
 
 namespace
 {
-    struct WriteRequest final : public hx::asys::libuv::filesystem::FsRequest
-    {
-    private:
-        hx::ArrayPin* pin;
-        const uv_file file;
-        const int64_t pos;
-
-    public:
-        const uv_buf_t buffer;
-
-        WriteRequest(hx::ArrayPin* _pin, uv_file _file, int64_t _pos, int _offset, int _length, Dynamic _cbSuccess, Dynamic _cbFailure)
-            : FsRequest(_cbSuccess, _cbFailure)
-            , pin(_pin)
-            , file(_file)
-            , pos(_pos)
-            , buffer(uv_buf_init(pin->GetBase() + _offset, _length))
-        {
-            //
-        }
-
-        ~WriteRequest()
-        {
-           delete pin;
-        }
-
-        void run(uv_loop_t* loop) override
-        {
-            auto result = uv_fs_write(loop, &uv, file, &buffer, 1, pos, FsRequest::callback);
-            if (result < 0)
-            {
-                Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
-            }
-        }
-    };
-
     struct ReadRequest final : public  hx::asys::libuv::filesystem::FsRequest
     {
     private:
@@ -66,11 +31,6 @@ namespace
             , length(_length)
             , pos(_pos)
             , progress(0)
-        {
-            //
-        }
-
-        void run(uv_loop_t* loop) override
         {
             //
         }
@@ -216,27 +176,14 @@ void hx::asys::filesystem::File_obj::open(Context ctx, String path, int flags, D
 {
     class FileOpenRequest : public hx::asys::libuv::filesystem::FsRequest
     {
-        const int flags;
-        const int mode;
-        hx::RootedObject<hx::asys::libuv::LibuvAsysContext_obj> ctx;
+        std::unique_ptr<hx::strbuf> pathBuffer;
 
     public:
-        FileOpenRequest(hx::asys::libuv::LibuvAsysContext _ctx, String _path, Dynamic _cbSuccess, Dynamic _cbFailure, const int _flags, const int _mode)
-            : FsRequest(_path, _cbSuccess, _cbFailure)
-            , flags(_flags)
-            , mode(_mode)
-            , ctx(_ctx.mPtr)
+        FileOpenRequest(Dynamic _cbSuccess, Dynamic _cbFailure, std::unique_ptr<hx::strbuf> _pathBuffer)
+            : FsRequest(_cbSuccess, _cbFailure)
+            , pathBuffer(std::move(_pathBuffer))
         {
 
-        }
-
-        void run(uv_loop_t* loop) override
-        {
-            auto result = uv_fs_open(loop , &uv, path, flags, flags, onOpenCallback);
-            if (result < 0)
-            {
-                Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
-            }
         }
 
         static void onOpenCallback(uv_fs_t* request)
@@ -250,15 +197,50 @@ void hx::asys::filesystem::File_obj::open(Context ctx, String path, int flags, D
             }
             else
             {
-                Dynamic(spRequest->cbSuccess.rooted)(hx::asys::filesystem::File(new hx::asys::libuv::filesystem::LibuvFile_obj(spRequest->ctx.rooted, spRequest->uv.result, String::create(spRequest->uv.path))));
+                Dynamic(spRequest->cbSuccess.rooted)(
+                    hx::asys::filesystem::File(
+                        new hx::asys::libuv::filesystem::LibuvFile_obj(request->loop, spRequest->uv.result, String::create(spRequest->uv.path))));
+            }
+        }
+    };
+
+    class FileOpenWork : public hx::asys::libuv::WorkRequest
+    {
+        const int flags;
+        const int mode;
+        std::unique_ptr<hx::strbuf> pathBuffer;
+        const char* path;
+
+    public:
+        FileOpenWork(Dynamic _cbSuccess, Dynamic _cbFailure, String _path, int _flags, int _mode)
+            : WorkRequest(_cbSuccess, _cbFailure)
+            , pathBuffer(new hx::strbuf())
+            , flags(_flags)
+            , mode(_mode)
+            , path(_path.utf8_str(pathBuffer.get()))
+        {
+            //
+        }
+
+        void run(uv_loop_t* loop) override
+        {
+            auto request = std::make_unique<FileOpenRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(pathBuffer));
+            auto result  = uv_fs_open(loop, &request->uv, path, flags, flags, FileOpenRequest::onOpenCallback);
+            if (result < 0)
+            {
+                Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+            }
+            else
+            {
+                request.release();
             }
         }
     };
 
     auto libuvCtx = hx::asys::libuv::context(ctx);
-    auto request  = std::make_unique<FileOpenRequest>(libuvCtx, path, cbSuccess, cbFailure, openFlag(flags), openMode(flags));
+    auto request  = std::make_unique<FileOpenWork>(cbSuccess, cbFailure, path, openFlag(flags), openMode(flags));
 
-    libuvCtx->enqueue(std::move(request));
+    libuvCtx->ctx->enqueue(std::move(request));
 }
 //
 //void hx::asys::filesystem::File_obj::temp(Context ctx, Dynamic cbSuccess, Dynamic cbFailure)
@@ -310,14 +292,66 @@ void hx::asys::filesystem::File_obj::open(Context ctx, String path, int flags, D
 //    }
 //}
 
-hx::asys::libuv::filesystem::LibuvFile_obj::LibuvFile_obj(hx::asys::libuv::LibuvAsysContext _ctx, uv_file _file, const String _path)
+hx::asys::libuv::filesystem::LibuvFile_obj::LibuvFile_obj(uv_loop_t* _loop, uv_file _file, const String _path)
     : File_obj(_path)
-    , ctx(_ctx)
+    , loop(_loop)
+    , closed(false)
     , file(_file) {}
 
 void hx::asys::libuv::filesystem::LibuvFile_obj::write(::cpp::Int64 pos, Array<uint8_t> data, int offset, int length, Dynamic cbSuccess, Dynamic cbFailure)
 {
-    ctx->enqueue(std::move(std::make_unique<WriteRequest>(data->Pin(), file, pos, offset, length, cbSuccess, cbFailure)));
+    struct WriteRequest final : public hx::asys::libuv::filesystem::FsRequest
+    {
+    private:
+        std::unique_ptr<hx::ArrayPin> pin;
+
+    public:
+        const uv_buf_t buffer;
+
+        WriteRequest(std::unique_ptr<hx::ArrayPin> _pin, const int _offset, const int _length, Dynamic _cbSuccess, Dynamic _cbFailure)
+            : FsRequest(_cbSuccess, _cbFailure)
+            , pin(std::move(_pin))
+            , buffer(uv_buf_init(pin->GetBase() + _offset, _length))
+        {
+            //
+        }
+    };
+
+    class WriteWork final : public hx::asys::libuv::WorkRequest
+    {
+        std::unique_ptr<hx::ArrayPin> pin;
+        const uv_file file;
+        const int64_t pos;
+        const int offset;
+        const int length;
+
+    public:
+        WriteWork(Dynamic _cbSuccess, Dynamic _cbFailure, hx::ArrayPin* _pin, uv_file _file, int64_t _pos, int _offset, int _length)
+            : WorkRequest(_cbSuccess, _cbFailure)
+            , pin(_pin)
+            , file(_file)
+            , pos(_pos)
+            , offset(_offset)
+            , length(_length) {}
+
+        void run(uv_loop_t* loop) override
+        {
+            auto request = std::make_unique<WriteRequest>(std::move(pin), offset, length, cbSuccess.rooted, cbFailure.rooted);
+            auto result  = uv_fs_write(loop, &request->uv, file, &request->buffer, 1, pos, FsRequest::callback);
+            if (result < 0)
+            {
+                Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+            }
+            else
+            {
+                request.release();
+            }
+        }
+    };
+
+    auto ctx = static_cast<LibuvAsysContext_obj::Ctx*>(loop->data);
+
+    ctx->enqueue(std::move(std::make_unique<WriteWork>(cbSuccess, cbFailure, data->Pin(), file, pos, offset, length)));
 }
 //
 //void hx::asys::libuv::filesystem::LibuvFile_obj::read(::cpp::Int64 pos, Array<uint8_t> output, int offset, int length, Dynamic cbSuccess, Dynamic cbFailure)
@@ -427,29 +461,63 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::write(::cpp::Int64 pos, Array<u
 
 void hx::asys::libuv::filesystem::LibuvFile_obj::close(Dynamic cbSuccess, Dynamic cbFailure)
 {
-    struct CloseRequest : public FsRequest
+    class CloseWork final : public hx::asys::libuv::WorkRequest
     {
         const uv_file file;
 
-        CloseRequest(const uv_file _file, Dynamic _cbSuccess, Dynamic _cbFailure) : FsRequest(_cbSuccess, _cbFailure), file(_file) {}
+    public:
+        CloseWork(const uv_file _file, Dynamic _cbSuccess, Dynamic _cbFailure) : WorkRequest(_cbSuccess, _cbFailure), file(_file) {}
 
         void run(uv_loop_t* loop) override
         {
-            auto result = uv_fs_close(loop, &uv, file, FsRequest::callback);
+            auto request = std::make_unique<FsRequest>(cbSuccess.rooted, cbFailure.rooted);
+            auto result  = uv_fs_close(loop, &request->uv, file, FsRequest::callback);
             if (result < 0)
             {
                 Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
             }
+            else
+            {
+                request.release();
+            }
         }
     };
 
-    ctx->enqueue(std::move(std::make_unique<CloseRequest>(file, cbSuccess, cbFailure)));
+    if (closed)
+    {
+        cbSuccess();
+
+        return;
+    }
+
+    closed = true;
+
+    auto ctx = static_cast<LibuvAsysContext_obj::Ctx*>(loop->data);
+
+    ctx->enqueue(std::move(std::make_unique<CloseWork>(file, cbSuccess.mPtr, cbFailure.mPtr)));
+
+    //struct CloseRequest : public FsRequest
+    //{
+    //    const uv_file file;
+
+    //    CloseRequest(const uv_file _file, Dynamic _cbSuccess, Dynamic _cbFailure) : FsRequest(_cbSuccess, _cbFailure), file(_file) {}
+
+    //    void run(uv_loop_t* loop) override
+    //    {
+    //        auto result = uv_fs_close(loop, &uv, file, FsRequest::callback);
+    //        if (result < 0)
+    //        {
+    //            Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+    //        }
+    //    }
+    //};
+
+    //ctx->enqueue(std::move(std::make_unique<CloseRequest>(file, cbSuccess, cbFailure)));
 }
 
 void hx::asys::libuv::filesystem::LibuvFile_obj::__Mark(hx::MarkContext* __inCtx)
 {
     HX_MARK_MEMBER(path);
-    HX_MARK_MEMBER(ctx);
 }
 
 #ifdef HXCPP_VISIT_ALLOCS
@@ -457,7 +525,6 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::__Mark(hx::MarkContext* __inCtx
 void hx::asys::libuv::filesystem::LibuvFile_obj::__Visit(hx::VisitContext* __inCtx)
 {
     HX_VISIT_MEMBER(path);
-    HX_VISIT_MEMBER(ctx);
 }
 
 #endif
