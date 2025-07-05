@@ -43,6 +43,7 @@ Array<unsigned char> __hxcpp_resource_bytes(String inName);
 // System access
 Array<String>  __get_args();
 double         __time_stamp();
+::cpp::Int64   __time_stamp_ms();
 
 HXCPP_EXTERN_CLASS_ATTRIBUTES void __hxcpp_print_string(const String &inV);
 HXCPP_EXTERN_CLASS_ATTRIBUTES void __hxcpp_println_string(const String &inV);
@@ -161,7 +162,7 @@ HXCPP_EXTERN_CLASS_ATTRIBUTES String __hxcpp_utf8_string_to_char_bytes(String &i
 
 // --- HashRoot ---------------------------------------------------------------------
 
-HXCPP_EXTERN_CLASS_ATTRIBUTES int           __root_hash_size(Dynamic *rtHash);
+HXCPP_EXTERN_CLASS_ATTRIBUTES int           __root_hash_size(Dynamic &rtHash);
 
 // --- IntHash ----------------------------------------------------------------------
 

@@ -7,6 +7,14 @@
 #include "GcRegCapture.h"
 #include <hx/Unordered.h>
 
+#ifdef EMSCRIPTEN
+   #include <emscripten/stack.h>
+   #ifdef HXCPP_SINGLE_THREADED_APP
+      // Use provided tools to measure stack extent
+      #define HXCPP_EXPLICIT_STACK_EXTENT
+   #endif
+#endif
+
 #include <string>
 #include <stdlib.h>
 
@@ -28,7 +36,6 @@ int gSlowPath = 0;
 using hx::gByteMarkID;
 using hx::gRememberedByteMarkID;
 
-// #define HXCPP_SINGLE_THREADED_APP
 
 namespace hx
 {
@@ -108,10 +115,6 @@ static size_t sgMaximumFreeSpace  = 1024*1024*1024;
 static size_t sgMaximumFreeSpace  = 1024*1024*1024;
 #endif
 
-#ifdef EMSCRIPTEN
-// #define HXCPP_STACK_UP
-#endif
-
 
 // #define HXCPP_GC_DEBUG_LEVEL 1
 
@@ -137,7 +140,7 @@ static size_t sgMaximumFreeSpace  = 1024*1024*1024;
 //#define HXCPP_GC_SUMMARY
 //#define PROFILE_COLLECT
 //#define PROFILE_THREAD_USAGE
-//#define HX_GC_VERIFY
+//#define HXCPP_GC_VERIFY
 //#define HX_GC_VERIFY_ALLOC_START
 //#define SHOW_MEM_EVENTS
 //#define SHOW_MEM_EVENTS_VERBOSE
@@ -155,7 +158,7 @@ static size_t sgMaximumFreeSpace  = 1024*1024*1024;
 //  every collect so you can see where it goes wrong (usually requires HX_GC_FIXED_BLOCKS)
 //#define HX_WATCH
 
-#if defined(HX_GC_VERIFY) && defined(HXCPP_GC_GENERATIONAL)
+#if defined(HXCPP_GC_VERIFY) && defined(HXCPP_GC_GENERATIONAL)
 #define HX_GC_VERIFY_GENERATIONAL
 #endif
 
@@ -189,7 +192,7 @@ static bool sGcVerifyGenerational = false;
 #endif
 
 
-#if HX_HAS_ATOMIC && (HXCPP_GC_DEBUG_LEVEL==0) && !defined(HX_GC_VERIFY) && !defined(EMSCRIPTEN)
+#if HX_HAS_ATOMIC && (HXCPP_GC_DEBUG_LEVEL==0) && !defined(HXCPP_GC_VERIFY) && !defined(EMSCRIPTEN)
   #if defined(HX_MACOS) || defined(HX_WINDOWS) || defined(HX_LINUX)
   enum { MAX_GC_THREADS = 4 };
   #else
@@ -580,7 +583,7 @@ static ThreadPoolLock sThreadPoolLock;
 typedef pthread_cond_t ThreadPoolSignal;
 inline void WaitThreadLocked(ThreadPoolSignal &ioSignal)
 {
-   pthread_cond_wait(&ioSignal, &sThreadPoolLock.mMutex);
+   pthread_cond_wait(&ioSignal, sThreadPoolLock.mMutex);
 }
 #else
 typedef HxSemaphore ThreadPoolSignal;
@@ -724,6 +727,13 @@ static int gBlockInfoEmptySlots = 0;
 #define ZEROED_NOT    0
 #define ZEROED_THREAD 1
 #define ZEROED_AUTO   2
+
+// Align padding based on block offset
+#ifdef HXCPP_ALIGN_ALLOC
+    #define ALIGN_PADDING(x) (4-(x&4))
+#else
+    #define ALIGN_PADDING(x) 0
+#endif
 
 struct BlockDataInfo
 {
@@ -1199,6 +1209,13 @@ struct BlockDataInfo
          int last = scan + mRanges[h].length;
          if (inOffset<last)
          {
+            #ifdef HXCPP_ALIGN_ALLOC
+            // Make sure header scan is odd-int aligned so the following object will be even-int
+            // aligned
+            if (!(scan & 0x4))
+               scan += 4;
+            #endif
+
             // Found hole that the object was possibly allocated in
             while(scan<=inOffset)
             {
@@ -1234,6 +1251,12 @@ struct BlockDataInfo
                   return allocString;
                }
                scan = end;
+               #ifdef HXCPP_ALIGN_ALLOC
+               // Make sure scan is odd-int aligned so the following object will be even-int
+               // aligned
+               if (!(scan & 0x4))
+                  scan += 4;
+               #endif
             }
             break;
          }
@@ -1350,7 +1373,7 @@ struct BlockDataInfo
    }
    #endif
 
-   #ifdef HX_GC_VERIFY
+   #ifdef HXCPP_GC_VERIFY
    void verify(const char *inWhere)
    {
       for(int i=IMMIX_HEADER_LINES;i<IMMIX_LINES;i++)
@@ -1468,6 +1491,14 @@ void GCCheckPointer(void *inPtr)
 
 void GCOnNewPointer(void *inPtr)
 {
+   #ifdef HXCPP_ALIGN_ALLOC
+   if ( (size_t)inPtr & 0x7 )
+   {
+      GCLOG("Misaligned pointer %p\n", inPtr);
+      NullReference("Object", false);
+   }
+   #endif
+
    #ifdef HXCPP_GC_DEBUG_ALWAYS_MOVE
    hx::sgPointerMoved.erase(inPtr);
    _hx_atomic_add(&sgAllocsSinceLastSpam, 1);
@@ -3178,6 +3209,10 @@ public:
 
    void FreeLarge(void *inLarge)
    {
+#ifdef HXCPP_TELEMETRY
+       __hxt_gc_free_large(inLarge);
+#endif
+
       ((unsigned char *)inLarge)[HX_ENDIAN_MARK_ID_BYTE] = 0;
       // AllocLarge will not lock this list unless it decides there is a suitable
       //  value, so we can't doa realloc without potentially crashing it.
@@ -3304,6 +3339,10 @@ public:
 
       if (do_lock)
          mLargeListLock.Unlock();
+
+#ifdef HXCPP_TELEMETRY
+      __hxt_gc_alloc(result + 2, inSize);
+#endif
 
       return result+2;
    }
@@ -3528,7 +3567,7 @@ public:
       for(int i=0;i<BLOCK_OFSIZE_COUNT;i++)
          mNextFreeBlockOfSize[i] = newSize;
 
-      #ifdef HX_GC_VERIFY
+      #ifdef HXCPP_GC_VERIFY
       VerifyBlockOrder();
       #endif
 
@@ -3753,7 +3792,7 @@ public:
                         int size = ((header & IMMIX_ALLOC_SIZE_MASK) >> IMMIX_ALLOC_SIZE_SHIFT);
                         int allocSize = size + sizeof(int);
 
-                        while(allocSize>destLen)
+                        while(allocSize + ALIGN_PADDING(destPos)>destLen)
                         {
                            hole++;
                            if (hole<holes)
@@ -3784,6 +3823,10 @@ public:
                               destLen = destInfo->mRanges[hole].length;
                            }
                         }
+
+                        #ifdef HXCPP_ALIGN_ALLOC
+                        destPos += ALIGN_PADDING(destPos);
+                        #endif
 
                         int startRow = destPos>>IMMIX_LINE_BITS;
 
@@ -3904,6 +3947,8 @@ public:
       return 0;
    }
 
+ 
+
    int MoveSurvivors(hx::QuickVec<hx::Object *> *inRemembered)
    {
       int sourceScan = 0;
@@ -3958,7 +4003,7 @@ public:
                            int allocSize = size + sizeof(int);
 
                            // Find dest reqion ...
-                           while(destHole==0 || destLen<allocSize)
+                           while(destHole==0 || destLen < ALIGN_PADDING(destPos) + allocSize)
                            {
                               if (destHole==0)
                               {
@@ -3971,7 +4016,7 @@ public:
                                  destHole = -1;
                                  destLen = 0;
                               }
-                              if (destLen<allocSize)
+                              if (destLen + ALIGN_PADDING(0)<allocSize)
                               {
                                  destHole++;
                                  if (destHole>=destInfo->mHoles)
@@ -3987,6 +4032,11 @@ public:
                            }
 
                            // TODO - not copy + paste
+
+                        printf("Move!\n");
+                           #ifdef HXCPP_ALIGN_ALLOC
+                           destPos += ALIGN_PADDING(destPos);
+                           #endif
 
                            int startRow = destPos>>IMMIX_LINE_BITS;
 
@@ -4067,7 +4117,7 @@ public:
              gAllocGroups[mAllBlocks[i]->mGroupId].isEmpty=false;
       }
 
-      #ifdef HX_GC_VERIFY
+      #ifdef HXCPP_GC_VERIFY
       typedef std::pair< void *, void * > ReleasedRange;
       std::vector<ReleasedRange> releasedRange;
       std::vector<int> releasedGids;
@@ -4083,7 +4133,7 @@ public:
             #ifdef SHOW_MEM_EVENTS_VERBOSE
             GCLOG("Release group %d: %p -> %p\n", i, g.alloc, g.alloc+groupBytes);
             #endif
-            #ifdef HX_GC_VERIFY
+            #ifdef HXCPP_GC_VERIFY
             releasedRange.push_back( ReleasedRange(g.alloc, g.alloc+groupBytes) );
             releasedGids.push_back(i);
             #endif
@@ -4112,7 +4162,7 @@ public:
          }
          else
          {
-            #ifdef HX_GC_VERIFY
+            #ifdef HXCPP_GC_VERIFY
             for(int g=0;g<releasedGids.size();g++)
                if (mAllBlocks[i]->mGroupId == releasedGids[g])
                {
@@ -4124,7 +4174,7 @@ public:
          }
       }
 
-      #ifdef HX_GC_VERIFY
+      #ifdef HXCPP_GC_VERIFY
       for(int i=0;i<mAllBlocks.size();i++)
       {
          BlockDataInfo *info = mAllBlocks[i];
@@ -4463,7 +4513,7 @@ public:
       {
          waitForThreadWake(inId);
 
-         #ifdef HX_GC_VERIFY
+         #ifdef HXCPP_GC_VERIFY
          if (! (sRunningThreads & (1<<inId)) )
             printf("Bad running threads!\n");
          #endif
@@ -4639,11 +4689,11 @@ public:
 
       char strBuf[100];
       if (bytes<k)
-         sprintf(strBuf,"%d", (int)bytes);
+         snprintf(strBuf,sizeof(strBuf),"%d", (int)bytes);
       else if (bytes<meg)
-         sprintf(strBuf,"%.2fk", (double)bytes/k);
+         snprintf(strBuf,sizeof(strBuf),"%.2fk", (double)bytes/k);
       else
-         sprintf(strBuf,"%.2fmb", (double)bytes/meg);
+         snprintf(strBuf,sizeof(strBuf),"%.2fmb", (double)bytes/meg);
       return strBuf;
    }
    #endif
@@ -4803,7 +4853,7 @@ public:
 
       hx::RunFinalizers();
 
-      #ifdef HX_GC_VERIFY
+      #ifdef HXCPP_GC_VERIFY
       for(int i=0;i<mAllBlocks.size();i++)
          mAllBlocks[i]->verify("After mark");
       #endif
@@ -4827,7 +4877,7 @@ public:
    }
    #endif
 
-   #ifdef HX_GC_VERIFY
+   #ifdef HXCPP_GC_VERIFY
    void VerifyBlockOrder()
    {
       for(int i=1;i<mAllBlocks.size();i++)
@@ -5239,7 +5289,7 @@ public:
 
             std::stable_sort(&mAllBlocks[0], &mAllBlocks[0] + mAllBlocks.size(), SortByBlockPtr );
 
-            #ifdef HX_GC_VERIFY
+            #ifdef HXCPP_GC_VERIFY
             VerifyBlockOrder();
             #endif
          }
@@ -5365,7 +5415,7 @@ public:
       #endif
 
 
-      #ifdef HX_GC_VERIFY
+      #ifdef HXCPP_GC_VERIFY
       VerifyBlockOrder();
       #endif
 
@@ -5699,7 +5749,13 @@ void MarkConservative(int *inBottom, int *inTop,hx::MarkContext *__inCtx)
       void *vptr = *(void **)ptr;
 
       MemType mem;
-      if (vptr && !((size_t)vptr & 0x03) && vptr!=prev && vptr!=lastPin)
+      #ifdef HXCPP_ALIGN_ALLOC
+      const size_t validObjectMask = 0x07;
+      #else
+      const size_t validObjectMask = 0x03;
+      #endif
+
+      if (vptr && !((size_t)vptr & validObjectMask) && vptr!=prev && vptr!=lastPin)
       {
 
          #ifdef PROFILE_COLLECT
@@ -5822,8 +5878,10 @@ class LocalAllocator : public hx::StackContext
 
    bool           mMoreHoles;
 
+   #ifndef HXCPP_EXPLICIT_STACK_EXTENT
    int *mTopOfStack;
    int *mBottomOfStack;
+   #endif
 
    hx::RegisterCaptureBuffer mRegisterBuf;
    int                   mRegisterBufSize;
@@ -5861,7 +5919,9 @@ public:
 
    void AttachThread(int *inTopOfStack)
    {
+      #ifndef HXCPP_EXPLICIT_STACK_EXTENT
       mTopOfStack = mBottomOfStack = inTopOfStack;
+      #endif
 
       mRegisterBufSize = 0;
       mStackLocks = 0;
@@ -5919,7 +5979,9 @@ public:
       }
       #endif
 
+      #ifndef HXCPP_EXPLICIT_STACK_EXTENT
       mTopOfStack = mBottomOfStack = 0;
+      #endif
 
       sGlobalAlloc->RemoveLocalLocked(this);
 
@@ -5951,7 +6013,7 @@ public:
    // Other places may call this to ensure the the current thread is registered
    //  indefinitely (until forcefully revoked)
    //
-   // Normally liraries/mains will then let this dangle.
+   // Normally libraries/mains will then let this dangle.
    //
    // However after the main, on android it calls SetTopOfStack(0,true), to unregister the thread,
    // because it is likely to be the ui thread, and the remaining call will be from
@@ -5976,13 +6038,28 @@ public:
    //  SetTopOfStack(top,true) -> add stack lock
    //  SetTopOfStack(0,_) -> pop stack lock. If all gone, clear global stack lock
    //
+
+   #ifdef HXCPP_EXPLICIT_STACK_EXTENT // {
+
+   void SetTopOfStack(int *inTop,bool inPush) { }
+   void PushTopOfStack(void *inTop) { }
+   void PopTopOfStack() { }
+   void SetBottomOfStack(int *inBottom) { }
+   void PauseForCollect() { }
+   void EnterGCFreeZone() { }
+   bool TryGCFreeZone() { return true; }
+   bool TryExitGCFreeZone() { return false; }
+   void ExitGCFreeZoneLocked() { }
+
+
+   #else // } !HXCPP_EXPLICIT_STACK_EXTENT {
    void SetTopOfStack(int *inTop,bool inPush)
    {
       if (inTop)
       {
          if (!mTopOfStack)
             mTopOfStack = inTop;
-         // EMSCRIPTEN the stack grows upwards
+         // EMSCRIPTEN the stack grows upwards - not wasm.
          // It could be that the main routine was called from deep with in the stack,
          //  then some callback was called from a higher location on the stack
          #ifdef HXCPP_STACK_UP
@@ -6045,39 +6122,6 @@ public:
       #ifdef VerifyStackRead
       VerifyStackRead(mBottomOfStack, mTopOfStack)
       #endif
-   }
-
-   virtual void SetupStackAndCollect(bool inMajor, bool inForceCompact, bool inLocked=false,bool inFreeIsFragged=false)
-   {
-      #ifndef HXCPP_SINGLE_THREADED_APP
-        #if HXCPP_DEBUG
-        if (mGCFreeZone)
-           CriticalGCError("Collecting from a GC-free thread");
-        #endif
-      #endif
-
-      volatile int dummy = 1;
-      mBottomOfStack = (int *)&dummy;
-
-      CAPTURE_REGS;
-
-      if (!mTopOfStack)
-         mTopOfStack = mBottomOfStack;
-      // EMSCRIPTEN the stack grows upwards
-      #ifdef HXCPP_STACK_UP
-      if (mBottomOfStack < mTopOfStack)
-         mTopOfStack = mBottomOfStack;
-      #else
-      if (mBottomOfStack > mTopOfStack)
-         mTopOfStack = mBottomOfStack;
-      #endif
-
-      #ifdef VerifyStackRead
-      VerifyStackRead(mBottomOfStack, mTopOfStack)
-      #endif
-
-
-      sGlobalAlloc->Collect(inMajor, inForceCompact, inLocked, inFreeIsFragged);
    }
 
 
@@ -6205,27 +6249,68 @@ public:
       #endif
    }
 
+   #endif // }  HXCPP_EXPLICIT_STACK_EXTENT
+
+
+   void SetupStackAndCollect(bool inMajor, bool inForceCompact, bool inLocked=false,bool inFreeIsFragged=false)
+   {
+      #ifndef HXCPP_SINGLE_THREADED_APP
+        #if HXCPP_DEBUG
+        if (mGCFreeZone)
+           CriticalGCError("Collecting from a GC-free thread");
+        #endif
+      #endif
+
+      #ifndef HXCPP_EXPLICIT_STACK_EXTENT
+      volatile int dummy = 1;
+      mBottomOfStack = (int *)&dummy;
+
+      CAPTURE_REGS;
+
+      if (!mTopOfStack)
+         mTopOfStack = mBottomOfStack;
+
+      // EMSCRIPTEN the stack grows upwards
+      #ifdef HXCPP_STACK_UP
+      if (mBottomOfStack < mTopOfStack)
+         mTopOfStack = mBottomOfStack;
+      #else
+      if (mBottomOfStack > mTopOfStack)
+         mTopOfStack = mBottomOfStack;
+      #endif
+
+      #ifdef VerifyStackRead
+      VerifyStackRead(mBottomOfStack, mTopOfStack)
+      #endif
+
+      #endif
+
+
+      sGlobalAlloc->Collect(inMajor, inForceCompact, inLocked, inFreeIsFragged);
+   }
+
+
+
    void ExpandAlloc(int &ioSize)
    {
-      #ifdef HXCPP_GC_NURSERY
-      int spaceStart = spaceFirst - allocBase - 4;
-      int spaceEnd = spaceOversize - allocBase - 4;
-      #endif
-
-
-      int size = ioSize + sizeof(int);
       #ifdef HXCPP_ALIGN_ALLOC
-      // If we start in even-int offset, we need to skip 8 bytes to get alloc on even-int
-      if (size+spaceStart>spaceEnd || !(spaceStart & 7))
-         size += 4;
+      // Do nothing here - aligning to the end of the row will bump the
+      // next allocation, so it's not clear if its a good idea.
+      #else
+         #ifdef HXCPP_GC_NURSERY
+         int spaceStart = spaceFirst - allocBase - 4;
+         int spaceEnd = spaceOversize - allocBase - 4;
+         #endif
+
+         int size = ioSize + sizeof(int);
+         int end = spaceStart + size;
+         if (end <= spaceEnd)
+         {
+            int linePad = IMMIX_LINE_LEN - (end & (IMMIX_LINE_LEN-1));
+            if (linePad>0 && linePad<=64)
+               ioSize += linePad;
+         }
       #endif
-      int end = spaceStart + size;
-      if (end <= spaceEnd)
-      {
-         int linePad = IMMIX_LINE_LEN - (end & (IMMIX_LINE_LEN-1));
-         if (linePad>0 && linePad<=64)
-            ioSize += linePad;
-      }
    }
 
 
@@ -6243,18 +6328,11 @@ public:
       if (inSize==0)
          return hx::emptyAlloc;
 
-      #if defined(HXCPP_VISIT_ALLOCS) && defined(HXCPP_M64)
+      #if defined(HXCPP_VISIT_ALLOCS) && (defined(HXCPP_M64)||defined(HXCPP_ARM64))
       // Make sure we can fit a relocation pointer
       int allocSize = sizeof(int) + std::max(8,inSize);
       #else
       int allocSize = sizeof(int) + inSize;
-      #endif
-
-      #ifdef HXCPP_ALIGN_ALLOC
-      // If we start in even-int offset, we need to skip 8 bytes to get alloc on even-int
-      int skip4 = allocSize+spaceStart>spaceEnd || !(spaceStart & 7) ? 4 : 0;
-      #else
-      enum { skip4 = 0 };
       #endif
 
       #if HXCPP_GC_DEBUG_LEVEL>0
@@ -6265,6 +6343,10 @@ public:
       {
          #ifdef HXCPP_GC_NURSERY
             unsigned char *buffer = spaceFirst;
+            #ifdef HXCPP_ALIGN_ALLOC
+            if ((size_t)buffer & 0x4 )
+               buffer += 4;
+            #endif
             unsigned char *end = buffer + allocSize;
 
             if ( end <= spaceOversize )
@@ -6285,13 +6367,14 @@ public:
             if (s>spaceFirst && mFraggedRows)
                *mFraggedRows += (s - spaceFirst)>>IMMIX_LINE_BITS;
          #else
-            int end = spaceStart + allocSize + skip4;
+            #ifdef HXCPP_ALIGN_ALLOC
+            if (!((size_t)spaceStart & 0x4 ))
+               spaceStart += 4;
+            #endif
+
+            int end = spaceStart + allocSize;
             if (end <= spaceEnd)
             {
-               #ifdef HXCPP_ALIGN_ALLOC
-               spaceStart += skip4;
-               #endif
-
                unsigned int *buffer = (unsigned int *)(allocBase + spaceStart);
 
                int startRow = spaceStart>>IMMIX_LINE_BITS;
@@ -6306,6 +6389,10 @@ public:
 
                #if defined(HXCPP_GC_CHECK_POINTER) && defined(HXCPP_GC_DEBUG_ALWAYS_MOVE)
                hx::GCOnNewPointer(buffer);
+               #endif
+
+               #ifdef HXCPP_TELEMETRY
+               __hxt_gc_alloc(buffer, inSize);
                #endif
 
                return buffer;
@@ -6391,11 +6478,13 @@ public:
 
    void Mark(hx::MarkContext *__inCtx)
    {
+      #ifndef HXCPP_SINGLE_THREADED_APP
       if (!mTopOfStack)
       {
          Reset();
          return;
       }
+      #endif
 
       #ifdef SHOW_MEM_EVENTS
       //int here = 0;
@@ -6405,19 +6494,33 @@ public:
       #ifdef HXCPP_DEBUG
          MarkPushClass("Stack",__inCtx);
          MarkSetMember("Stack",__inCtx);
+
+         #ifdef HXCPP_EXPLICIT_STACK_EXTENT
+           hx::MarkConservative( (int *)emscripten_stack_get_current(),(int *)emscripten_stack_get_base(), __inCtx);
+         #else
          if (mTopOfStack && mBottomOfStack)
             hx::MarkConservative(mBottomOfStack, mTopOfStack , __inCtx);
+         #endif
+
          #ifdef HXCPP_SCRIPTABLE
             MarkSetMember("ScriptStack",__inCtx);
             hx::MarkConservative((int *)(stack), (int *)(pointer),__inCtx);
          #endif
          MarkSetMember("Registers",__inCtx);
          hx::MarkConservative(CAPTURE_REG_START, CAPTURE_REG_END, __inCtx);
+
+
          MarkPopClass(__inCtx);
       #else
-         if (mTopOfStack && mBottomOfStack)
-            hx::MarkConservative(mBottomOfStack, mTopOfStack , __inCtx);
-         hx::MarkConservative(CAPTURE_REG_START, CAPTURE_REG_END, __inCtx);
+
+         #ifdef HXCPP_EXPLICIT_STACK_EXTENT
+           hx::MarkConservative( (int *)emscripten_stack_get_current(), (int *) emscripten_stack_get_base(), __inCtx);
+         #else
+            if (mTopOfStack && mBottomOfStack)
+               hx::MarkConservative(mBottomOfStack, mTopOfStack , __inCtx);
+            hx::MarkConservative(CAPTURE_REG_START, CAPTURE_REG_END, __inCtx);
+         #endif
+
          #ifdef HXCPP_SCRIPTABLE
             hx::MarkConservative((int *)(stack), (int *)(pointer),__inCtx);
          #endif
@@ -6450,6 +6553,7 @@ inline LocalAllocator *GetLocalAlloc(bool inAllowEmpty=false)
    #endif
 }
 
+#ifndef HXCPP_SINGLE_THREADED_APP
 void WaitForSafe(LocalAllocator *inAlloc)
 {
    inAlloc->WaitForSafe();
@@ -6459,6 +6563,7 @@ void ReleaseFromSafe(LocalAllocator *inAlloc)
 {
    inAlloc->ReleaseFromSafe();
 }
+#endif
 
 void MarkLocalAlloc(LocalAllocator *inAlloc,hx::MarkContext *__inCtx)
 {
@@ -6620,8 +6725,7 @@ void SetTopOfStack(int *inTop,bool inForce)
 
 void *InternalNew(int inSize,bool inIsObject)
 {
-   //HX_STACK_FRAME("GC", "new", 0, "GC::new", "src/hx/GCInternal.cpp", __LINE__, 0)
-   HX_STACK_FRAME("GC", "new", 0, "GC::new", "src/hx/GCInternal.cpp", inSize, 0)
+   // HX_STACK_FRAME("GC", "new", 0, "GC::new", __FILE__, __LINE__, 0)
 
    #ifdef HXCPP_DEBUG
    if (sgSpamCollects && sgAllocsSinceLastSpam>=sgSpamCollects)
@@ -6732,7 +6836,7 @@ void *InternalRealloc(int inFromSize, void *inData,int inSize, bool inExpand)
       return hx::InternalNew(inSize,false);
    }
 
-   HX_STACK_FRAME("GC", "realloc", 0, "GC::relloc", __FILE__ , __LINE__, 0)
+   // HX_STACK_FRAME("GC", "realloc", 0, "GC::relloc", __FILE__ , __LINE__, 0)
 
    #ifdef HXCPP_DEBUG
    if (sgSpamCollects && sgAllocsSinceLastSpam>=sgSpamCollects)

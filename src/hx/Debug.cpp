@@ -77,12 +77,15 @@ static void CriticalErrorHandler(String inErr, bool allowFixup)
       return;
 #endif
 
+#ifdef HXCPP_STACK_TRACE
+   hx::StackContext *ctx = hx::StackContext::getCurrent();
+   ctx->beginCatch(true);
+#endif
+
    if (sCriticalErrorHandler!=null())
       sCriticalErrorHandler(inErr);
 
 #ifdef HXCPP_STACK_TRACE
-   hx::StackContext *ctx = hx::StackContext::getCurrent();
-   ctx->beginCatch(true);
    ctx->dumpExceptionStack();
 #endif
 
@@ -189,10 +192,8 @@ StackContext::StackContext()
    mIsUnwindingException = false;
    #endif
 
-   #ifdef HXCPP_TELEMETRY
-   //mTelemetry = tlmCreate(this);
-   // Do not automatically start
-   mTelemetry = 0;
+   #if HXCPP_TELEMETRY
+   mTelemetry = tlmCreate(this);
    #endif
 
    #ifdef HXCPP_DEBUGGER

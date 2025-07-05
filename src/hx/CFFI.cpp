@@ -106,7 +106,7 @@ public:
          return _hxcpp_toString( Dynamic(this) );
 
       char buffer[40];
-      sprintf(buffer,"0x%p", mHandle);
+      snprintf(buffer,sizeof(buffer),"0x%p", mHandle);
 
       return HX_CSTRING("Abstract(") +
              __hxcpp_get_kind(this) +
@@ -997,7 +997,10 @@ const char16_t * hxs_utf16(const String &string,hx::IStringAlloc *alloc)
 }
 
 
-EXPORT void * hx_cffi(const char *inName)
+#ifndef HXCPP_STATIC_CFFI
+EXPORT
+#endif
+void * hx_cffi(const char *inName)
 {
    #define HXCPP_PRIME
    #define DEFFUNC(name,r,b,c) if ( !strcmp(inName,#name) ) return (void *)name;
