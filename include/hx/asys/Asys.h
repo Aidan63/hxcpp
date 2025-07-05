@@ -29,7 +29,8 @@ namespace hx
             Context_obj() /*: process(_process)*/ {}
 
         public:
-            static Context create();
+            static void boot();
+            static Context get();
 
             //const system::CurrentProcess process;
         };
@@ -69,13 +70,13 @@ namespace hx
                 File_obj(String _path) : path(_path) {}
 
                 virtual void write(::cpp::Int64 pos, Array<uint8_t> data, int offset, int length, Dynamic cbSuccess, Dynamic cbFailure) = 0;
-                /*virtual void read(::cpp::Int64 pos, Array<uint8_t> output, int offset, int length, Dynamic cbSuccess, Dynamic cbFailure) = 0;
+                virtual void read(::cpp::Int64 pos, Array<uint8_t> output, int offset, int length, Dynamic cbSuccess, Dynamic cbFailure) = 0;
                 virtual void info(Dynamic cbSuccess, Dynamic cbFailure) = 0;
                 virtual void resize(int size, Dynamic cbSuccess, Dynamic cbFailure) = 0;
                 virtual void setPermissions(int permissions, Dynamic cbSuccess, Dynamic cbFailure) = 0;
                 virtual void setOwner(int user, int group, Dynamic cbSuccess, Dynamic cbFailure) = 0;
                 virtual void setTimes(int accessTime, int modificationTime, Dynamic cbSuccess, Dynamic cbFailure) = 0;
-                virtual void flush(Dynamic cbSuccess, Dynamic cbFailure) = 0;*/
+                virtual void flush(Dynamic cbSuccess, Dynamic cbFailure) = 0;
                 virtual void close(Dynamic cbSuccess, Dynamic cbFailure) = 0;
             };
 

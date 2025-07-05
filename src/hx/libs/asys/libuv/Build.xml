@@ -140,8 +140,8 @@
 
         <compilerflag value='-DWIN32_LEAN_AND_MEAN' if='windows'/>
 
-        <compilerflag value='/std:c++17' if='windows'/>
-        <compilerflag value='-std=c++17' unless='windows'/>
+        <compilerflag value='/std:c++20' if='windows'/>
+        <compilerflag value='-std=c++20' unless='windows'/>
 
         <compilerflag value='-I${LIBUV_DIR}/include'/>
         <compilerflag value='-I${LIBUV_DIR}/src'/>

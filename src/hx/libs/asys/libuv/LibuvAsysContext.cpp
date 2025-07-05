@@ -8,23 +8,20 @@
 
 namespace
 {
-    hx::asys::libuv::LibuvAsysContext_obj::Ctx* global = nullptr;
-    volatile int created = 0;
+    static std::atomic<::hx::asys::libuv::LibuvAsysContext_obj*> global = nullptr;
+    static std::latch latch(1);
 }
 
-hx::asys::Context hx::asys::Context_obj::create()
+void hx::asys::Context_obj::boot()
 {
-    if (nullptr == global)
-    {
-        global = new libuv::LibuvAsysContext_obj::Ctx();
-    }
+    global.store(new (::hx::NewObjectType::NewObjConst) ::hx::asys::libuv::LibuvAsysContext_obj());
 
-    while (_hx_atomic_load(&created) == 0)
-    {
-        // 
-    }
+    latch.wait();
+}
 
-    return Context(new hx::asys::libuv::LibuvAsysContext_obj(global));
+hx::asys::Context hx::asys::Context_obj::get()
+{
+    return ::hx::asys::libuv::LibuvAsysContext(global.load());
 }
 
 hx::asys::libuv::LibuvAsysContext_obj::Ctx::Ctx()
@@ -62,7 +59,7 @@ void hx::asys::libuv::LibuvAsysContext_obj::Ctx::run()
         }
     }
 
-    _hx_atomic_store(&created, 1);
+    latch.count_down();
 
     hx::EnterGCFreeZone();
 
@@ -121,6 +118,6 @@ void hx::asys::libuv::LibuvAsysContext_obj::Ctx::enqueue(std::unique_ptr<WorkReq
     }
 }
 
-hx::asys::libuv::LibuvAsysContext_obj::LibuvAsysContext_obj(Ctx* _ctx /*, hx::asys::system::CurrentProcess _process */)
+hx::asys::libuv::LibuvAsysContext_obj::LibuvAsysContext_obj(/*, hx::asys::system::CurrentProcess _process */)
     // : hx::asys::Context_obj()
-    : ctx(_ctx) {}
+    : ctx(new Ctx()) {}

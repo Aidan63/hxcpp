@@ -8,6 +8,8 @@
 #include <deque>
 #include <array>
 #include <functional>
+#include <atomic>
+#include <latch>
 
 HX_DECLARE_CLASS3(hx, asys, libuv, LibuvAsysContext)
 
@@ -52,6 +54,6 @@ namespace hx::asys::libuv
 
         Ctx* ctx;
 
-        LibuvAsysContext_obj(Ctx* ctx);
+        LibuvAsysContext_obj();
     };
 }
