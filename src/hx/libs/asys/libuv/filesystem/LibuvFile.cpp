@@ -53,6 +53,51 @@ namespace
             return 0;
         }
     }
+
+    void onOpenCallback(uv_fs_t* request)
+    {
+        auto gcZone    = hx::AutoGCZone();
+        auto spRequest = std::unique_ptr<hx::asys::libuv::filesystem::FsRequest>(static_cast<hx::asys::libuv::filesystem::FsRequest*>(request->data));
+
+        if (spRequest->uv.result < 0)
+        {
+            Dynamic(spRequest->cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(spRequest->uv.result));
+        }
+        else
+        {
+            Dynamic(spRequest->cbSuccess.rooted)(hx::asys::filesystem::File(new hx::asys::libuv::filesystem::LibuvFile_obj(spRequest->uv.loop, spRequest->uv.result, String::create(spRequest->uv.path))));
+        }
+    }
+
+    void onStatCallback(uv_fs_t* request)
+    {
+        auto gcZone    = hx::AutoGCZone();
+        auto spRequest = std::unique_ptr<hx::asys::libuv::filesystem::FsRequest>(static_cast<hx::asys::libuv::filesystem::FsRequest*>(request->data));
+
+        if (spRequest->uv.result < 0)
+        {
+            Dynamic(spRequest->cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(spRequest->uv.result));
+        }
+        else
+        {
+            auto statBuf = hx::Anon_obj::Create();
+            statBuf->__SetField(HX_CSTRING("atime"), static_cast<int>(spRequest->uv.statbuf.st_atim.tv_sec), hx::PropertyAccess::paccDynamic);
+            statBuf->__SetField(HX_CSTRING("mtime"), static_cast<int>(spRequest->uv.statbuf.st_mtim.tv_sec), hx::PropertyAccess::paccDynamic);
+            statBuf->__SetField(HX_CSTRING("ctime"), static_cast<int>(spRequest->uv.statbuf.st_ctim.tv_sec), hx::PropertyAccess::paccDynamic);
+            statBuf->__SetField(HX_CSTRING("dev"), static_cast<int>(spRequest->uv.statbuf.st_dev), hx::PropertyAccess::paccDynamic);
+            statBuf->__SetField(HX_CSTRING("uid"), static_cast<int>(spRequest->uv.statbuf.st_uid), hx::PropertyAccess::paccDynamic);
+            statBuf->__SetField(HX_CSTRING("gid"), static_cast<int>(spRequest->uv.statbuf.st_gid), hx::PropertyAccess::paccDynamic);
+            statBuf->__SetField(HX_CSTRING("ino"), static_cast<int>(spRequest->uv.statbuf.st_ino), hx::PropertyAccess::paccDynamic);
+            statBuf->__SetField(HX_CSTRING("mode"), static_cast<int>(spRequest->uv.statbuf.st_mode), hx::PropertyAccess::paccDynamic);
+            statBuf->__SetField(HX_CSTRING("nlink"), static_cast<int>(spRequest->uv.statbuf.st_nlink), hx::PropertyAccess::paccDynamic);
+            statBuf->__SetField(HX_CSTRING("rdev"), static_cast<int>(spRequest->uv.statbuf.st_rdev), hx::PropertyAccess::paccDynamic);
+            statBuf->__SetField(HX_CSTRING("size"), static_cast<int>(spRequest->uv.statbuf.st_size), hx::PropertyAccess::paccDynamic);
+            statBuf->__SetField(HX_CSTRING("blksize"), static_cast<int>(spRequest->uv.statbuf.st_blksize), hx::PropertyAccess::paccDynamic);
+            statBuf->__SetField(HX_CSTRING("blocks"), static_cast<int>(spRequest->uv.statbuf.st_blocks), hx::PropertyAccess::paccDynamic);
+
+            Dynamic(spRequest->cbSuccess.rooted)(statBuf);
+        }
+    }
 }
 
 void hx::asys::filesystem::File_obj::open(Context ctx, String path, int flags, Dynamic cbSuccess, Dynamic cbFailure)
@@ -64,27 +109,7 @@ void hx::asys::filesystem::File_obj::open(Context ctx, String path, int flags, D
     public:
         FileOpenRequest(Dynamic _cbSuccess, Dynamic _cbFailure, std::unique_ptr<hx::strbuf> _pathBuffer)
             : FsRequest(_cbSuccess, _cbFailure)
-            , pathBuffer(std::move(_pathBuffer))
-        {
-
-        }
-
-        static void onOpenCallback(uv_fs_t* request)
-        {
-            auto spRequest = std::unique_ptr<FileOpenRequest>(static_cast<FileOpenRequest*>(request->data));
-            auto gcZone    = hx::AutoGCZone();
-
-            if (spRequest->uv.result < 0)
-            {
-                Dynamic(spRequest->cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(spRequest->uv.result));
-            }
-            else
-            {
-                Dynamic(spRequest->cbSuccess.rooted)(
-                    hx::asys::filesystem::File(
-                        new hx::asys::libuv::filesystem::LibuvFile_obj(request->loop, spRequest->uv.result, String::create(spRequest->uv.path))));
-            }
-        }
+            , pathBuffer(std::move(_pathBuffer)) {}
     };
 
     class FileOpenWork : public hx::asys::libuv::WorkRequest
@@ -108,7 +133,7 @@ void hx::asys::filesystem::File_obj::open(Context ctx, String path, int flags, D
         void run(uv_loop_t* loop) override
         {
             auto request = std::make_unique<FileOpenRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(pathBuffer));
-            auto result  = uv_fs_open(loop, &request->uv, path, flags, flags, FileOpenRequest::onOpenCallback);
+            auto result  = uv_fs_open(loop, &request->uv, path, flags, flags, onOpenCallback);
             if (result < 0)
             {
                 Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
@@ -125,55 +150,100 @@ void hx::asys::filesystem::File_obj::open(Context ctx, String path, int flags, D
 
     libuvCtx->ctx->enqueue(std::move(request));
 }
-//
-//void hx::asys::filesystem::File_obj::temp(Context ctx, Dynamic cbSuccess, Dynamic cbFailure)
-//{
-//    auto size     = size_t{ 1 };
-//    auto nullchar = '\0';
-//    auto result   = uv_os_tmpdir(&nullchar, &size);
-//    if (result < 0 && result != UV_ENOBUFS)
-//    {
-//        cbFailure(hx::asys::libuv::uv_err_to_enum(result));
-//    }
-//
-//    auto buffer = std::vector<char>(size);
-//    result = uv_os_tmpdir(buffer.data(), &size);
-//    if (result < 0)
-//    {
-//        cbFailure(hx::asys::libuv::uv_err_to_enum(result));
-//    }
-//
-//    auto path     = std::filesystem::path(buffer.data()) / std::filesystem::path("XXXXXX");
-//    auto libuvCtx = hx::asys::libuv::context(ctx);
-//    auto request  = std::make_unique<hx::asys::libuv::filesystem::FsRequest>(cbSuccess, cbFailure);
-//
-//    result = uv_fs_mkstemp(libuvCtx->uvLoop, &request->uv, path.u8string().c_str(), onOpenCallback);
-//
-//    if (result < 0)
-//    {
-//        cbFailure(hx::asys::libuv::uv_err_to_enum(result));
-//    }
-//    else
-//    {
-//        request.release();
-//    }
-//}
 
-//void hx::asys::filesystem::File_obj::info(Context ctx, String path, Dynamic cbSuccess, Dynamic cbFailure)
-//{
-//    auto libuvCtx = hx::asys::libuv::context(ctx);
-//    auto request  = std::make_unique<StatRequest>(path, cbSuccess, cbFailure);
-//    auto result   = uv_fs_stat(libuvCtx->uvLoop, &request->uv, request->path, StatRequest::callback);
-//
-//    if (result < 0)
-//    {
-//        cbFailure(hx::asys::libuv::uv_err_to_enum(result));
-//    }
-//    else
-//    {
-//        request.release();
-//    }
-//}
+void hx::asys::filesystem::File_obj::temp(Context ctx, Dynamic cbSuccess, Dynamic cbFailure)
+{
+    class TempWork : public hx::asys::libuv::WorkRequest
+    {
+        std::filesystem::path path;
+
+    public:
+        TempWork(Dynamic _cbSuccess, Dynamic _cbFailure, std::filesystem::path _path) : WorkRequest(_cbSuccess, _cbFailure), path(_path) {}
+
+        void run(uv_loop_t* loop) override
+        {
+            auto request = std::make_unique<hx::asys::libuv::filesystem::FsRequest>(cbSuccess.rooted, cbFailure.rooted);
+            auto result  = uv_fs_mkstemp(loop, &request->uv, path.string().c_str(), onOpenCallback);
+            if (result < 0)
+            {
+                Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+            }
+            else
+            {
+                request.release();
+            }
+        }
+    };
+
+    auto size     = size_t{ 1 };
+    auto nullchar = '\0';
+    auto result   = uv_os_tmpdir(&nullchar, &size);
+    if (result < 0 && result != UV_ENOBUFS)
+    {
+        cbFailure(hx::asys::libuv::uv_err_to_enum(result));
+
+        return;
+    }
+
+    auto buffer = std::vector<char>(size);
+    result = uv_os_tmpdir(buffer.data(), &size);
+    if (result < 0)
+    {
+        cbFailure(hx::asys::libuv::uv_err_to_enum(result));
+
+        return;
+    }
+
+    auto path     = std::filesystem::path(buffer.data()) / std::filesystem::path("XXXXXX");
+    auto libuvCtx = hx::asys::libuv::context(ctx);
+
+    libuvCtx->ctx->enqueue(std::move(std::make_unique<TempWork>(cbSuccess, cbFailure, path)));
+}
+
+void hx::asys::filesystem::File_obj::info(Context ctx, String path, Dynamic cbSuccess, Dynamic cbFailure)
+{
+    class InfoRequest final : public hx::asys::libuv::filesystem::FsRequest
+    {
+        std::unique_ptr<hx::strbuf> buffer;
+
+    public:
+        InfoRequest(Dynamic _cbSuccess, Dynamic _cbFailure, std::unique_ptr<hx::strbuf> _buffer)
+            : FsRequest(_cbSuccess, _cbFailure)
+            , buffer(std::move(_buffer)) {}
+    };
+
+    class InfoWork final : public hx::asys::libuv::WorkRequest
+    {
+        std::unique_ptr<hx::strbuf> buffer;
+        const char* path;
+
+    public:
+        InfoWork(Dynamic _cbSuccess, Dynamic _cbFailure, std::unique_ptr<hx::strbuf> _buffer, const char* _path)
+            : WorkRequest(_cbSuccess, _cbFailure)
+            , buffer(std::move(_buffer))
+            , path(_path) {}
+
+        void run(uv_loop_t* loop) override
+        {
+            auto request = std::make_unique<InfoRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(buffer));
+            auto result  = uv_fs_stat(loop, &request->uv, path, onStatCallback);
+            if (result < 0)
+            {
+                Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+            }
+            else
+            {
+                request.release();
+            }
+        }
+    };
+
+    auto libuvCtx   = hx::asys::libuv::context(ctx);
+    auto pathBuffer = std::make_unique<hx::strbuf>();
+    auto pathString = path.utf8_str(pathBuffer.get());
+
+    libuvCtx->ctx->enqueue(std::move(std::make_unique<InfoWork>(cbSuccess, cbFailure, std::move(pathBuffer), pathString)));
+}
 
 hx::asys::libuv::filesystem::LibuvFile_obj::LibuvFile_obj(uv_loop_t* _loop, uv_file _file, const String _path)
     : File_obj(_path)
@@ -295,46 +365,6 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::read(::cpp::Int64 pos, Array<ui
 
 void hx::asys::libuv::filesystem::LibuvFile_obj::info(Dynamic cbSuccess, Dynamic cbFailure)
 {
-    class StatRequest final : public hx::asys::libuv::filesystem::FsRequest
-    {
-    public:
-        static void callback(uv_fs_t* request)
-        {
-            auto gcZone    = hx::AutoGCZone();
-            auto spRequest = std::unique_ptr<StatRequest>(static_cast<StatRequest*>(request->data));
-
-            if (spRequest->uv.result < 0)
-            {
-                Dynamic(spRequest->cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(spRequest->uv.result));
-            }
-            else
-            {
-                auto statBuf = hx::Anon_obj::Create();
-                statBuf->__SetField(HX_CSTRING("atime"), static_cast<int>(spRequest->uv.statbuf.st_atim.tv_sec), hx::PropertyAccess::paccDynamic);
-                statBuf->__SetField(HX_CSTRING("mtime"), static_cast<int>(spRequest->uv.statbuf.st_mtim.tv_sec), hx::PropertyAccess::paccDynamic);
-                statBuf->__SetField(HX_CSTRING("ctime"), static_cast<int>(spRequest->uv.statbuf.st_ctim.tv_sec), hx::PropertyAccess::paccDynamic);
-                statBuf->__SetField(HX_CSTRING("dev"), static_cast<int>(spRequest->uv.statbuf.st_dev), hx::PropertyAccess::paccDynamic);
-                statBuf->__SetField(HX_CSTRING("uid"), static_cast<int>(spRequest->uv.statbuf.st_uid), hx::PropertyAccess::paccDynamic);
-                statBuf->__SetField(HX_CSTRING("gid"), static_cast<int>(spRequest->uv.statbuf.st_gid), hx::PropertyAccess::paccDynamic);
-                statBuf->__SetField(HX_CSTRING("ino"), static_cast<int>(spRequest->uv.statbuf.st_ino), hx::PropertyAccess::paccDynamic);
-                statBuf->__SetField(HX_CSTRING("mode"), static_cast<int>(spRequest->uv.statbuf.st_mode), hx::PropertyAccess::paccDynamic);
-                statBuf->__SetField(HX_CSTRING("nlink"), static_cast<int>(spRequest->uv.statbuf.st_nlink), hx::PropertyAccess::paccDynamic);
-                statBuf->__SetField(HX_CSTRING("rdev"), static_cast<int>(spRequest->uv.statbuf.st_rdev), hx::PropertyAccess::paccDynamic);
-                statBuf->__SetField(HX_CSTRING("size"), static_cast<int>(spRequest->uv.statbuf.st_size), hx::PropertyAccess::paccDynamic);
-                statBuf->__SetField(HX_CSTRING("blksize"), static_cast<int>(spRequest->uv.statbuf.st_blksize), hx::PropertyAccess::paccDynamic);
-                statBuf->__SetField(HX_CSTRING("blocks"), static_cast<int>(spRequest->uv.statbuf.st_blocks), hx::PropertyAccess::paccDynamic);
-
-                Dynamic(spRequest->cbSuccess.rooted)(statBuf);
-            }
-        }
-
-        StatRequest(String _path, Dynamic _cbSuccess, Dynamic _cbFailure)
-            : FsRequest(_path, _cbSuccess, _cbFailure) {}
-
-        StatRequest(Dynamic _cbSuccess, Dynamic _cbFailure)
-            : FsRequest(_cbSuccess, _cbFailure) {}
-    };
-
     class StatWork final : public hx::asys::libuv::WorkRequest
     {
         const uv_file file;
@@ -349,8 +379,8 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::info(Dynamic cbSuccess, Dynamic
 
         void run(uv_loop_t* loop) override
         {
-            auto request = std::make_unique<StatRequest>(cbSuccess.rooted, cbFailure.rooted);
-            auto result  = uv_fs_fstat(loop, &request->uv, file, StatRequest::callback);
+            auto request = std::make_unique<hx::asys::libuv::filesystem::FsRequest>(cbSuccess.rooted, cbFailure.rooted);
+            auto result  = uv_fs_fstat(loop, &request->uv, file, onStatCallback);
             if (result < 0)
             {
                 Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));

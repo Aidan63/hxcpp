@@ -62,8 +62,8 @@ namespace hx
             {
             public:
                 static void open(Context ctx, String path, int flags, Dynamic cbSuccess, Dynamic cbFailure);
-                /*static void temp(Context ctx, Dynamic cbSuccess, Dynamic cbFailure);
-                static void info(Context ctx, String path, Dynamic cbSuccess, Dynamic cbFailure);*/
+                static void temp(Context ctx, Dynamic cbSuccess, Dynamic cbFailure);
+                static void info(Context ctx, String path, Dynamic cbSuccess, Dynamic cbFailure);
 
                 const String path;
 
