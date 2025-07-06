@@ -87,7 +87,7 @@ namespace hx
 
                 Directory_obj(String _path) : path(_path) {}
 
-                //static void open(Context ctx, String path, Dynamic cbSuccess, Dynamic cbFailure);
+                static void open(Context ctx, String path, Dynamic cbSuccess, Dynamic cbFailure);
                 static void create(Context ctx, String path, int permissions, Dynamic cbSuccess, Dynamic cbFailure);
                 static void rename(Context ctx, String oldPath, String newPath, Dynamic cbSuccess, Dynamic cbFailure);
                 static void check(Context ctx, String path, FileAccessMode accessMode, Dynamic cbSuccess, Dynamic cbFailure);
@@ -103,8 +103,8 @@ namespace hx
                 static void copyFile(Context ctx, String source, String destination, bool overwrite, Dynamic cbSuccess, Dynamic cbFailure);
                 static void realPath(Context ctx, String path, Dynamic cbSuccess, Dynamic cbFailure);
 
-                /*virtual void next(int batch, Dynamic cbSuccess, Dynamic cbFailure) = 0;
-                virtual void close(Dynamic cbSuccess, Dynamic cbFailure) = 0;*/
+                virtual void next(int batch, Dynamic cbSuccess, Dynamic cbFailure) = 0;
+                virtual void close(Dynamic cbSuccess, Dynamic cbFailure) = 0;
             };
         }
 

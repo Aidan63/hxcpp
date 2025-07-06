@@ -49,113 +49,189 @@ namespace
         }
     }
 
-    class NextEntriesRequest : public hx::asys::libuv::filesystem::FsRequest
-    {
-    public:
-        std::vector<uv_dirent_t> entries;
-
-        NextEntriesRequest(Dynamic cbSuccess, Dynamic cbFailure, const int _batch)
-            : FsRequest(cbSuccess, cbFailure)
-            , entries(_batch) {}
-    };
-
     class LibuvDirectory_obj : public hx::asys::filesystem::Directory_obj
     {
-    public:
         uv_loop_t* loop;
         uv_dir_t* dir;
+        std::atomic_bool closed;
 
-        LibuvDirectory_obj(uv_loop_t* _loop, uv_dir_t* _dir, String _path)
-            : Directory_obj(_path), loop(_loop), dir(_dir) {}
-
-        void next(const int batch, Dynamic cbSuccess, Dynamic cbFailure)
+    public:
+        LibuvDirectory_obj(uv_loop_t* _loop, uv_dir_t* _dir, ::String _path) : Directory_obj(_path), loop(_loop), dir(_dir), closed(false)
         {
-            auto wrapper = [](uv_fs_t* request) {
-                auto gcZone    = hx::AutoGCZone();
-                auto spRequest = static_cast<NextEntriesRequest*>(request->data);
+            HX_OBJ_WB_NEW_MARKED_OBJECT(this);
+        }
 
-                if (spRequest->uv.result < 0)
-                {
-                    Dynamic(spRequest->cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(spRequest->uv.result));
+        void next(const int batch, Dynamic cbSuccess, Dynamic cbFailure) override
+        {
+            class NextRequest final : public hx::asys::libuv::filesystem::FsRequest
+            {
+            public:
+                std::vector<uv_dirent_t> entries;
+
+                NextRequest(Dynamic cbSuccess, Dynamic cbFailure, const int _batch)
+                    : FsRequest(cbSuccess, cbFailure)
+                    , entries(_batch) {
                 }
-                else
+
+                static void onCallback(uv_fs_t* request)
                 {
-                    auto entries = Array<String>(spRequest->uv.result, 0);
+                    auto gcZone    = hx::AutoGCZone();
+                    auto spRequest = static_cast<NextRequest*>(request->data);
 
-                    for (auto i = 0; i < spRequest->uv.result; i++)
+                    if (spRequest->uv.result < 0)
                     {
-                        if (nullptr != spRequest->entries.at(i).name)
-                        {
-                            entries[i] = String::create(spRequest->entries.at(i).name);
-                        }
+                        Dynamic(spRequest->cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(spRequest->uv.result));
                     }
+                    else
+                    {
+                        auto entries = Array<String>(spRequest->uv.result, 0);
 
-                    Dynamic(spRequest->cbSuccess.rooted)(entries);
+                        for (auto i = 0; i < spRequest->uv.result; i++)
+                        {
+                            if (nullptr != spRequest->entries.at(i).name)
+                            {
+                                entries[i] = String::create(spRequest->entries.at(i).name);
+                            }
+                        }
+
+                        Dynamic(spRequest->cbSuccess.rooted)(entries);
+                    }
                 }
             };
 
-            auto request = std::make_unique<NextEntriesRequest>(cbSuccess, cbFailure, batch);
-            dir->nentries = request->entries.capacity();
-            dir->dirents  = request->entries.data();
-
-            auto result = uv_fs_readdir(loop, &request->uv, dir, wrapper);
-
-            if (result < 0)
+            class NextWork final : public hx::asys::libuv::WorkRequest
             {
-                cbFailure(hx::asys::libuv::uv_err_to_enum(result));
-            }
-            else
-            {
-                request.release();
-            }
+                uv_dir_t* dir;
+                const int batch;
+
+            public:
+                NextWork(Dynamic _cbSuccess, Dynamic _cbFailure, uv_dir_t* _dir, const int _batch)
+                    : WorkRequest(_cbSuccess, _cbFailure)
+                    , dir(_dir)
+                    , batch(_batch) {}
+
+                void run(uv_loop_t* loop) override
+                {
+                    auto request = std::make_unique<NextRequest>(cbSuccess.rooted, cbFailure.rooted, batch);
+                    dir->nentries = request->entries.capacity();
+                    dir->dirents  = request->entries.data();
+
+                    auto result = uv_fs_readdir(loop, &request->uv, dir, NextRequest::onCallback);
+                    if (result < 0)
+                    {
+                        Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+                    }
+                    else
+                    {
+                        request.release();
+                    }
+                }
+            };
+
+            auto ctx = static_cast<hx::asys::libuv::LibuvAsysContext_obj::Ctx*>(loop->data);
+
+            ctx->enqueue(std::move(std::make_unique<NextWork>(cbSuccess.mPtr, cbFailure.mPtr, dir, batch)));
         }
 
-        void close(Dynamic cbSuccess, Dynamic cbFailure)
+        void close(Dynamic cbSuccess, Dynamic cbFailure) override
         {
-            auto request = std::make_unique<hx::asys::libuv::filesystem::FsRequest>(cbSuccess, cbFailure);
-            auto result  = uv_fs_closedir(loop, &request->uv, dir, hx::asys::libuv::filesystem::FsRequest::callback);
+            class CloseWork final : public hx::asys::libuv::WorkRequest
+            {
+                uv_dir_t* dir;
 
-            if (result < 0)
+            public:
+                CloseWork(Dynamic _cbSuccess, Dynamic _cbFailure, uv_dir_t* _dir) : WorkRequest(_cbSuccess, _cbFailure), dir(_dir) {}
+
+                void run(uv_loop_t* loop) override
+                {
+                    auto request = std::make_unique<hx::asys::libuv::filesystem::FsRequest>(cbSuccess.rooted, cbFailure.rooted);
+                    auto result  = uv_fs_closedir(loop, &request->uv, dir, hx::asys::libuv::filesystem::FsRequest::callback);
+                    if (result < 0)
+                    {
+                        Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+                    }
+                    else
+                    {
+                        request.release();
+                    }
+                }
+            };
+
+            auto expected = false;
+            if (false == closed.compare_exchange_strong(expected, true))
             {
-                cbFailure(hx::asys::libuv::uv_err_to_enum(result));
+                cbSuccess();
+
+                return;
             }
-            else
-            {
-                request.release();
-            }
+
+            auto ctx = static_cast<hx::asys::libuv::LibuvAsysContext_obj::Ctx*>(loop->data);
+
+            ctx->enqueue(std::move(std::make_unique<CloseWork>(cbSuccess.mPtr, cbFailure.mPtr, dir)));
         }
     };
 }
 
-//void hx::asys::filesystem::Directory_obj::open(Context ctx, String path, Dynamic cbSuccess, Dynamic cbFailure)
-//{
-//    auto libuvCtx = hx::asys::libuv::context(ctx);
-//    auto wrapper  = [](uv_fs_t* request) {
-//        auto gcZone    = hx::AutoGCZone();
-//        auto spRequest = std::unique_ptr<hx::asys::libuv::filesystem::FsRequest>(static_cast<hx::asys::libuv::filesystem::FsRequest*>(request->data));
-//
-//        if (spRequest->uv.result < 0)
-//        {
-//            Dynamic(spRequest->cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(spRequest->uv.result));
-//        }
-//        else
-//        {
-//            Dynamic(spRequest->cbSuccess.rooted)(Directory(new LibuvDirectory_obj(spRequest->uv.loop, static_cast<uv_dir_t*>(spRequest->uv.ptr), String::create(spRequest->uv.path))));
-//        }
-//    };
-//
-//    auto request = std::make_unique<hx::asys::libuv::filesystem::FsRequest>(path, cbSuccess, cbFailure);
-//    auto result  = uv_fs_opendir(libuvCtx->uvLoop, &request->uv, request->path, wrapper);
-//
-//    if (result < 0)
-//    {
-//        cbFailure(hx::asys::libuv::uv_err_to_enum(result));
-//    }
-//    else
-//    {
-//        request.release();
-//    }
-//}
+void hx::asys::filesystem::Directory_obj::open(Context ctx, String path, Dynamic cbSuccess, Dynamic cbFailure)
+{
+    class OpenRequest final : public hx::asys::libuv::filesystem::FsRequest
+    {
+        std::unique_ptr<hx::strbuf> pathBuffer;
+
+    public:
+        OpenRequest(Dynamic _cbSuccess, Dynamic _cbFailure, std::unique_ptr<hx::strbuf> _pathBuffer)
+            : FsRequest(_cbSuccess, _cbFailure)
+            , pathBuffer(std::move(_pathBuffer)) {
+        }
+
+        static void onCallback(uv_fs_t* request)
+        {
+            auto gcZone   = hx::AutoGCZone();
+            auto spRequest = std::unique_ptr<hx::asys::libuv::filesystem::FsRequest>(static_cast<hx::asys::libuv::filesystem::FsRequest*>(request->data));
+
+            if (spRequest->uv.result < 0)
+            {
+                Dynamic(spRequest->cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(spRequest->uv.result));
+            }
+            else
+            {
+                Dynamic(spRequest->cbSuccess.rooted)(Directory(new LibuvDirectory_obj(spRequest->uv.loop, static_cast<uv_dir_t*>(spRequest->uv.ptr), String::create(spRequest->uv.path))));
+            }
+        }
+    };
+
+    class OpenWork final : public hx::asys::libuv::WorkRequest
+    {
+        std::unique_ptr<hx::strbuf> pathBuffer;
+        const char* path;
+
+    public:
+        OpenWork(Dynamic _cbSuccess, Dynamic _cbFailure, std::unique_ptr<hx::strbuf> _pathBuffer, const char* _path)
+            : WorkRequest(_cbSuccess, _cbFailure)
+            , pathBuffer(std::move(_pathBuffer))
+            , path(_path) {}
+
+        void run(uv_loop_t* loop) override
+        {
+            auto request = std::make_unique<OpenRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(pathBuffer));
+            auto result  = uv_fs_opendir(loop, &request->uv, path, OpenRequest::onCallback);
+            if (result < 0)
+            {
+                Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+            }
+            else
+            {
+                request.release();
+            }
+        }
+    };
+
+    auto libuvCtx   = hx::asys::libuv::context(ctx);
+    auto pathBuffer = std::make_unique<hx::strbuf>();
+    auto pathString = path.utf8_str(pathBuffer.get());
+
+    libuvCtx->ctx->enqueue(std::move(std::make_unique<OpenWork>(cbSuccess, cbFailure, std::move(pathBuffer), pathString)));
+}
 
 void hx::asys::filesystem::Directory_obj::create(Context ctx, String path, int permissions, Dynamic cbSuccess, Dynamic cbFailure)
 {
