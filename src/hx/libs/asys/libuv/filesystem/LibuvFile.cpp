@@ -133,7 +133,7 @@ void hx::asys::filesystem::File_obj::open(Context ctx, String path, int flags, D
         void run(uv_loop_t* loop) override
         {
             auto request = std::make_unique<FileOpenRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(pathBuffer));
-            auto result  = uv_fs_open(loop, &request->uv, path, flags, flags, onOpenCallback);
+            auto result  = uv_fs_open(loop, &request->uv, path, flags, mode, onOpenCallback);
             if (result < 0)
             {
                 Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
