@@ -80,32 +80,32 @@ namespace hx
                 virtual void close(Dynamic cbSuccess, Dynamic cbFailure) = 0;
             };
 
-            //class Directory_obj : public Object
-            //{
-            //public:
-            //    const String path;
+            class Directory_obj : public Object
+            {
+            public:
+                const String path;
 
-            //    Directory_obj(String _path) : path(_path) {}
+                Directory_obj(String _path) : path(_path) {}
 
-            //    static void open(Context ctx, String path, Dynamic cbSuccess, Dynamic cbFailure);
-            //    static void create(Context ctx, String path, int permissions, Dynamic cbSuccess, Dynamic cbFailure);
-            //    static void rename(Context ctx, String oldPath, String newPath, Dynamic cbSuccess, Dynamic cbFailure);
-            //    static void check(Context ctx, String path, FileAccessMode accessMode, Dynamic cbSuccess, Dynamic cbFailure);
-            //    static void deleteFile(Context ctx, String path, Dynamic cbSuccess, Dynamic cbFailure);
-            //    static void deleteDirectory(Context ctx, String path, Dynamic cbSuccess, Dynamic cbFailure);
-            //    static void isDirectory(Context ctx, String path, Dynamic cbSuccess, Dynamic cbFailure);
-            //    static void isFile(Context ctx, String path, Dynamic cbSuccess, Dynamic cbFailure);
-            //    static void isLink(Context ctx, String path, Dynamic cbSuccess, Dynamic cbFailure);
-            //    static void setLinkOwner(Context ctx, String path, int user, int group, Dynamic cbSuccess, Dynamic cbFailure);
-            //    static void link(Context ctx, String target, String path, int type, Dynamic cbSuccess, Dynamic cbFailure);
-            //    static void linkInfo(Context ctx, String path, Dynamic cbSuccess, Dynamic cbFailure);
-            //    static void readLink(Context ctx, String path, Dynamic cbSuccess, Dynamic cbFailure);
-            //    static void copyFile(Context ctx, String source, String destination, bool overwrite, Dynamic cbSuccess, Dynamic cbFailure);
-            //    static void realPath(Context ctx, String path, Dynamic cbSuccess, Dynamic cbFailure);
+                //static void open(Context ctx, String path, Dynamic cbSuccess, Dynamic cbFailure);
+                static void create(Context ctx, String path, int permissions, Dynamic cbSuccess, Dynamic cbFailure);
+                static void rename(Context ctx, String oldPath, String newPath, Dynamic cbSuccess, Dynamic cbFailure);
+                static void check(Context ctx, String path, FileAccessMode accessMode, Dynamic cbSuccess, Dynamic cbFailure);
+                static void deleteFile(Context ctx, String path, Dynamic cbSuccess, Dynamic cbFailure);
+                static void deleteDirectory(Context ctx, String path, Dynamic cbSuccess, Dynamic cbFailure);
+                static void isDirectory(Context ctx, String path, Dynamic cbSuccess, Dynamic cbFailure);
+                static void isFile(Context ctx, String path, Dynamic cbSuccess, Dynamic cbFailure);
+                static void isLink(Context ctx, String path, Dynamic cbSuccess, Dynamic cbFailure);
+                static void setLinkOwner(Context ctx, String path, int user, int group, Dynamic cbSuccess, Dynamic cbFailure);
+                static void link(Context ctx, String target, String path, int type, Dynamic cbSuccess, Dynamic cbFailure);
+                static void linkInfo(Context ctx, String path, Dynamic cbSuccess, Dynamic cbFailure);
+                static void readLink(Context ctx, String path, Dynamic cbSuccess, Dynamic cbFailure);
+                static void copyFile(Context ctx, String source, String destination, bool overwrite, Dynamic cbSuccess, Dynamic cbFailure);
+                static void realPath(Context ctx, String path, Dynamic cbSuccess, Dynamic cbFailure);
 
-            //    virtual void next(int batch, Dynamic cbSuccess, Dynamic cbFailure) = 0;
-            //    virtual void close(Dynamic cbSuccess, Dynamic cbFailure) = 0;
-            //};
+                /*virtual void next(int batch, Dynamic cbSuccess, Dynamic cbFailure) = 0;
+                virtual void close(Dynamic cbSuccess, Dynamic cbFailure) = 0;*/
+            };
         }
 
         //namespace net
