@@ -6,6 +6,34 @@
 
 namespace
 {
+    struct ReverseRequest final : public hx::asys::libuv::BaseRequest
+    {
+        uv_getnameinfo_t uv;
+
+        ReverseRequest(Dynamic _cbSuccess, Dynamic _cbFailure) : BaseRequest(_cbSuccess, _cbFailure)
+        {
+            uv.data = this;
+        }
+
+        static void callback(uv_getnameinfo_t* request, int status, const char* hostname, const char* service)
+        {
+            auto gcZone    = hx::AutoGCZone();
+            auto spRequest = std::unique_ptr<BaseRequest>(static_cast<BaseRequest*>(request->data));
+
+            if (status < 0)
+            {
+                Dynamic(spRequest->cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(status));
+            }
+            else
+            {
+                Dynamic(spRequest->cbSuccess.rooted)(String::create(hostname));
+            }
+        }
+    };
+}
+
+void hx::asys::net::dns::resolve(Context ctx, String host, Dynamic cbSuccess, Dynamic cbFailure)
+{
     class AddrInfoCleaner
     {
     public:
@@ -18,12 +46,21 @@ namespace
         }
     };
 
-    class ResolveRequest : public hx::asys::libuv::BaseRequest
+    class ResolveRequest final : public hx::asys::libuv::BaseRequest
     {
-        hx::strbuf buffer;
+        std::unique_ptr<hx::strbuf> pathBuffer;
 
     public:
-        static void callback(uv_getaddrinfo_t* request, int status, addrinfo* addr)
+        uv_getaddrinfo_t uv;
+
+        ResolveRequest(Dynamic _cbSuccess, Dynamic _cbFailure, std::unique_ptr<hx::strbuf> _pathBuffer)
+            : BaseRequest(_cbSuccess, _cbFailure)
+            , pathBuffer(std::move(_pathBuffer))
+        {
+            uv.data = this;
+        }
+
+        static void onCallback(uv_getaddrinfo_t* request, int status, addrinfo* addr)
         {
             auto gcZone      = hx::AutoGCZone();
             auto spRequest   = std::unique_ptr<ResolveRequest>(static_cast<ResolveRequest*>(request->data));
@@ -61,99 +98,109 @@ namespace
                 Dynamic(spRequest->cbSuccess.rooted)(ips);
             }
         }
-
-        uv_getaddrinfo_t uv;
-
-        const char* host;
-
-        ResolveRequest(String _host, Dynamic _cbSuccess, Dynamic _cbFailure)
-            : BaseRequest(_cbSuccess, _cbFailure)
-            , host(_host.utf8_str(&buffer))
-        {
-            uv.data = this;
-        }
     };
 
-    struct ReverseRequest : public hx::asys::libuv::BaseRequest
+    class ResolveWork final : public hx::asys::libuv::WorkRequest
     {
-        static void callback(uv_getnameinfo_t* request, int status, const char* hostname, const char* service)
-        {
-            auto gcZone    = hx::AutoGCZone();
-            auto spRequest = std::unique_ptr<ReverseRequest>(static_cast<ReverseRequest*>(request->data));
+        std::unique_ptr<hx::strbuf> hostBuffer;
+        const char* host;
 
-            if (status < 0)
+    public:
+        ResolveWork(Dynamic _cbSuccess, Dynamic _cbFailure, std::unique_ptr<hx::strbuf> _hostBuffer, const char* _host)
+            : WorkRequest(_cbSuccess, _cbFailure)
+            , hostBuffer(std::move(_hostBuffer))
+            , host(_host) {}
+
+        void run(uv_loop_t* loop) override
+        {
+            auto hints = addrinfo();
+            hints.ai_family   = AF_UNSPEC;
+            hints.ai_socktype = SOCK_STREAM;
+            hints.ai_protocol = IPPROTO_TCP;
+            hints.ai_flags    = 0;
+
+            auto request = std::make_unique<ResolveRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(hostBuffer));
+            auto result  = uv_getaddrinfo(loop, &request->uv, ResolveRequest::onCallback, host, nullptr, &hints);
+            if (result < 0)
             {
-                Dynamic(spRequest->cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(status));
+                Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
             }
             else
             {
-                Dynamic(spRequest->cbSuccess.rooted)(String::create(hostname));
+                request.release();
             }
         }
-
-        uv_getnameinfo_t uv;
-
-        ReverseRequest(Dynamic _cbSuccess, Dynamic _cbFailure)
-            : BaseRequest(_cbSuccess, _cbFailure)
-        {
-            uv.data = this;
-        }
     };
-}
 
-void hx::asys::net::dns::resolve(Context ctx, String host, Dynamic cbSuccess, Dynamic cbFailure)
-{
-    auto libuvCtx = hx::asys::libuv::context(ctx);
-    auto request  = std::make_unique<ResolveRequest>(host, cbSuccess, cbFailure);
-    auto hints    = addrinfo();
+    auto libuvCtx   = hx::asys::libuv::context(ctx);
+    auto hostBuffer = std::make_unique<hx::strbuf>();
+    auto hostString = host.utf8_str(hostBuffer.get());
 
-    hints.ai_family   = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_protocol = IPPROTO_TCP;
-    hints.ai_flags = 0;
-
-    auto result = uv_getaddrinfo(libuvCtx->uvLoop, &request->uv, ResolveRequest::callback, host.utf8_str(), nullptr, &hints);
-
-    if (result < 0)
-    {
-        cbFailure(hx::asys::libuv::uv_err_to_enum(result));
-    }
-    else
-    {
-        request.release();
-    }
+    libuvCtx->ctx->enqueue(std::move(std::make_unique<ResolveWork>(cbSuccess, cbFailure, std::move(hostBuffer), hostString)));
 }
 
 void hx::asys::net::dns::reverse(Context ctx, const Ipv4Address ip, Dynamic cbSuccess, Dynamic cbFailure)
 {
-    auto libuvCtx = hx::asys::libuv::context(ctx);
-    auto request  = std::make_unique<ReverseRequest>(cbSuccess, cbFailure);
-    auto addr     = hx::asys::libuv::net::sockaddr_from_int(ip);
-    auto result   = uv_getnameinfo(libuvCtx->uvLoop, &request->uv, ReverseRequest::callback, reinterpret_cast<sockaddr*>(&addr), 0);
+    class ReverseWork final : public hx::asys::libuv::WorkRequest
+    {
+        sockaddr_in addr;
 
-    if (result < 0)
-    {
-        cbFailure(hx::asys::libuv::uv_err_to_enum(result));
-    }
-    else
-    {
-        request.release();
-    }
+    public:
+        ReverseWork(Dynamic _cbSuccess, Dynamic _cbFailure, sockaddr_in _addr) : WorkRequest(_cbSuccess, _cbFailure), addr(_addr)
+        {
+            //
+        }
+
+        void run(uv_loop_t* loop) override
+        {
+            auto request = std::make_unique<ReverseRequest>(cbSuccess.rooted, cbFailure.rooted);
+            auto result = uv_getnameinfo(loop, &request->uv, ReverseRequest::callback, reinterpret_cast<sockaddr*>(&addr), 0);
+            if (result < 0)
+            {
+                Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+            }
+            else
+            {
+                request.release();
+            }
+        }
+    };
+
+    auto libuvCtx = hx::asys::libuv::context(ctx);
+    auto addr     = hx::asys::libuv::net::sockaddr_from_int(ip);
+
+    libuvCtx->ctx->enqueue(std::move(std::make_unique<ReverseWork>(cbSuccess, cbFailure, addr)));
 }
 
 void hx::asys::net::dns::reverse(Context ctx, const Ipv6Address ip, Dynamic cbSuccess, Dynamic cbFailure)
 {
-    auto libuvCtx = hx::asys::libuv::context(ctx);
-    auto request  = std::make_unique<ReverseRequest>(cbSuccess, cbFailure);
-    auto addr     = hx::asys::libuv::net::sockaddr_from_data(ip);
-    auto result   = uv_getnameinfo(libuvCtx->uvLoop, &request->uv, ReverseRequest::callback, reinterpret_cast<sockaddr*>(&addr), 0);
+    class ReverseWork final : public hx::asys::libuv::WorkRequest
+    {
+        sockaddr_in6 addr;
 
-    if (result < 0)
-    {
-        cbFailure(hx::asys::libuv::uv_err_to_enum(result));
-    }
-    else
-    {
-        request.release();
-    }
+    public:
+        ReverseWork(Dynamic _cbSuccess, Dynamic _cbFailure, sockaddr_in6 _addr) : WorkRequest(_cbSuccess, _cbFailure), addr(_addr)
+        {
+            //
+        }
+
+        void run(uv_loop_t* loop) override
+        {
+            auto request = std::make_unique<ReverseRequest>(cbSuccess.rooted, cbFailure.rooted);
+            auto result = uv_getnameinfo(loop, &request->uv, ReverseRequest::callback, reinterpret_cast<sockaddr*>(&addr), 0);
+            if (result < 0)
+            {
+                Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+            }
+            else
+            {
+                request.release();
+            }
+        }
+    };
+
+    auto libuvCtx = hx::asys::libuv::context(ctx);
+    auto addr     = hx::asys::libuv::net::sockaddr_from_data(ip);
+
+    libuvCtx->ctx->enqueue(std::move(std::make_unique<ReverseWork>(cbSuccess, cbFailure, addr)));
 }
