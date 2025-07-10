@@ -152,8 +152,8 @@
         <file name='${this_dir}/net/LibuvDns.cpp'/>
         <file name='${this_dir}/net/LibuvIp.cpp'/>
         <file name='${this_dir}/net/NetUtils.cpp'/>
-      <!--<file name='${this_dir}/net/LibuvTcpSocket.cpp'/>
-        <file name='${this_dir}/net/LibuvTcpServer.cpp'/>
+        <file name='${this_dir}/net/LibuvTcpSocket.cpp'/>
+      <!--<file name='${this_dir}/net/LibuvTcpServer.cpp'/>
         <file name='${this_dir}/net/LibuvIpcSocket.cpp'/>
         <file name='${this_dir}/net/NetUtils.cpp'/>
         <file name='${this_dir}/stream/StreamWriter.cpp'/>

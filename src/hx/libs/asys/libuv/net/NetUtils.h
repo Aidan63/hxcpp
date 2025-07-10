@@ -13,7 +13,7 @@ namespace hx::asys::libuv::net
 
     ::hx::EnumBase ip_from_sockaddr(sockaddr_in6* addr);
 
-    ::hx::Anon getLocalAddress(uv_tcp_t* tcp);
+    int getLocalAddress(uv_tcp_t* tcp, ::hx::Anon& out);
 
-    ::hx::Anon getRemoteAddress(uv_tcp_t* tcp);
+    int getRemoteAddress(uv_tcp_t* tcp, ::hx::Anon& out);
 }

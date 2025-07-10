@@ -7,7 +7,7 @@
 
 namespace
 {
-	hx::Anon make_address_anon(sockaddr_storage& storage)
+	void make_address_anon(sockaddr_storage& storage, ::hx::Anon& out)
 	{
 		auto name   = std::array<char, UV_IF_NAMESIZE>();
 		auto port   = int(reinterpret_cast<sockaddr_in*>(&storage)->sin_port);
@@ -15,10 +15,10 @@ namespace
 
 		if ((result = uv_ip_name(reinterpret_cast<sockaddr*>(&storage), name.data(), name.size())) < 0)
 		{
-			return null();
+			return;
 		}
 
-		return
+		out =
 			hx::Anon_obj::Create(2)
 				->setFixed(0, HX_CSTRING("host"), String::create(name.data()))
 				->setFixed(1, HX_CSTRING("port"), port);
@@ -65,23 +65,25 @@ hx::EnumBase hx::asys::libuv::net::ip_from_sockaddr(sockaddr_in6* addr)
     return hx::asys::libuv::create(HX_CSTRING("INET6"), 1, 1)->_hx_init(0, bytes);
 }
 
-hx::Anon hx::asys::libuv::net::getLocalAddress(uv_tcp_t* tcp)
+int hx::asys::libuv::net::getLocalAddress(uv_tcp_t* tcp, ::hx::Anon& out)
 {
 	auto storage = sockaddr_storage();
-	auto length = int(sizeof(sockaddr_storage));
-	auto result = uv_tcp_getsockname(tcp, reinterpret_cast<sockaddr*>(&storage), &length);
+	auto length  = int(sizeof(sockaddr_storage));
+	auto result  = uv_tcp_getsockname(tcp, reinterpret_cast<sockaddr*>(&storage), &length);
 
 	if (result < 0)
 	{
-		return null();
+		return result;
 	}
 	else
 	{
-		return make_address_anon(storage);
+		make_address_anon(storage, out);
+
+		return 0;
 	}
 }
 
-hx::Anon hx::asys::libuv::net::getRemoteAddress(uv_tcp_t* tcp)
+int hx::asys::libuv::net::getRemoteAddress(uv_tcp_t* tcp, ::hx::Anon& out)
 {
 	auto storage = sockaddr_storage();
 	auto length = int(sizeof(sockaddr_storage));
@@ -89,10 +91,12 @@ hx::Anon hx::asys::libuv::net::getRemoteAddress(uv_tcp_t* tcp)
 
 	if (result < 0)
 	{
-		return null();
+		return result;
 	}
 	else
 	{
-		return make_address_anon(storage);
+		make_address_anon(storage, out);
+
+		return 0;
 	}
 }

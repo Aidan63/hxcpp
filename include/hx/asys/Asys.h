@@ -108,64 +108,65 @@ namespace hx
             };
         }
 
-        //namespace net
-        //{
-        //    namespace dns
-        //    {
-        //        void resolve(Context ctx, const String host, Dynamic cbSuccess, Dynamic cbFailure);
-        //        void reverse(Context ctx, const Ipv4Address ip, Dynamic cbSuccess, Dynamic cbFailure);
-        //        void reverse(Context ctx, const Ipv6Address ip, Dynamic cbSuccess, Dynamic cbFailure);
-        //    }
+        namespace net
+        {
+            namespace dns
+            {
+                void resolve(Context ctx, const String host, Dynamic cbSuccess, Dynamic cbFailure);
+                void reverse(Context ctx, const Ipv4Address ip, Dynamic cbSuccess, Dynamic cbFailure);
+                void reverse(Context ctx, const Ipv6Address ip, Dynamic cbSuccess, Dynamic cbFailure);
+            }
 
-        //    namespace ip
-        //    {
-        //        hx::EnumBase parse(const String ip);
-        //        String name(const Ipv4Address ip);
-        //        String name(const Ipv6Address ip);
-        //    }
+            namespace ip
+            {
+                hx::EnumBase parse(const String ip);
+                String name(const Ipv4Address ip);
+                String name(const Ipv6Address ip);
+            }
 
-        //    class TcpServer_obj : public Object
-        //    {
-        //    public:
-        //        hx::Anon localAddress;
+            //class TcpServer_obj : public Object
+            //{
+            //public:
+            //    hx::Anon localAddress;
 
-        //        static void open_ipv4(Context ctx, const String host, int port, Dynamic options, Dynamic cbSuccess, Dynamic cbFailure);
-        //        static void open_ipv6(Context ctx, const String host, int port, Dynamic options, Dynamic cbSuccess, Dynamic cbFailure);
+            //    static void open_ipv4(Context ctx, const String host, int port, Dynamic options, Dynamic cbSuccess, Dynamic cbFailure);
+            //    static void open_ipv6(Context ctx, const String host, int port, Dynamic options, Dynamic cbSuccess, Dynamic cbFailure);
 
-        //        virtual void accept(Dynamic cbSuccess, Dynamic cbFailure) = 0;
-        //        virtual void close(Dynamic cbSuccess, Dynamic cbFailure) = 0;
+            //    virtual void accept(Dynamic cbSuccess, Dynamic cbFailure) = 0;
+            //    virtual void close(Dynamic cbSuccess, Dynamic cbFailure) = 0;
 
-        //        virtual void getKeepAlive(Dynamic cbSuccess, Dynamic cbFailure) = 0;
-        //        virtual void getSendBufferSize(Dynamic cbSuccess, Dynamic cbFailure) = 0;
-        //        virtual void getRecvBufferSize(Dynamic cbSuccess, Dynamic cbFailure) = 0;
+            //    virtual void getKeepAlive(Dynamic cbSuccess, Dynamic cbFailure) = 0;
+            //    virtual void getSendBufferSize(Dynamic cbSuccess, Dynamic cbFailure) = 0;
+            //    virtual void getRecvBufferSize(Dynamic cbSuccess, Dynamic cbFailure) = 0;
 
-        //        virtual void setKeepAlive(bool keepAlive, Dynamic cbSuccess, Dynamic cbFailure) = 0;
-        //        virtual void setSendBufferSize(int size, Dynamic cbSuccess, Dynamic cbFailure) = 0;
-        //        virtual void setRecvBufferSize(int size, Dynamic cbSuccess, Dynamic cbFailure) = 0;
-        //    };
+            //    virtual void setKeepAlive(bool keepAlive, Dynamic cbSuccess, Dynamic cbFailure) = 0;
+            //    virtual void setSendBufferSize(int size, Dynamic cbSuccess, Dynamic cbFailure) = 0;
+            //    virtual void setRecvBufferSize(int size, Dynamic cbSuccess, Dynamic cbFailure) = 0;
+            //};
 
-        //    class TcpSocket_obj : public Object
-        //    {
-        //    public:
-        //        hx::Anon localAddress;
-        //        hx::Anon remoteAddress;
+            class TcpSocket_obj : public Object
+            {
+            public:
+                hx::Anon localAddress;
+                hx::Anon remoteAddress;
 
-        //        Writable writer;
-        //        Readable reader;
+                Writable writer;
+                Readable reader;
 
-        //        static void connect_ipv4(Context ctx, const String host, int port, Dynamic options, Dynamic cbSuccess, Dynamic cbFailure);
-        //        static void connect_ipv6(Context ctx, const String host, int port, Dynamic options, Dynamic cbSuccess, Dynamic cbFailure);
+                static void connect_ipv4(Context ctx, const String host, int port, Dynamic options, Dynamic cbSuccess, Dynamic cbFailure);
+                static void connect_ipv6(Context ctx, const String host, int port, Dynamic options, Dynamic cbSuccess, Dynamic cbFailure);
 
-        //        virtual void getKeepAlive(Dynamic cbSuccess, Dynamic cbFailure) = 0;
-        //        virtual void getSendBufferSize(Dynamic cbSuccess, Dynamic cbFailure) = 0;
-        //        virtual void getRecvBufferSize(Dynamic cbSuccess, Dynamic cbFailure) = 0;
+                /*virtual void getKeepAlive(Dynamic cbSuccess, Dynamic cbFailure) = 0;
+                virtual void getSendBufferSize(Dynamic cbSuccess, Dynamic cbFailure) = 0;
+                virtual void getRecvBufferSize(Dynamic cbSuccess, Dynamic cbFailure) = 0;
 
-        //        virtual void setKeepAlive(bool keepAlive, Dynamic cbSuccess, Dynamic cbFailure) = 0;
-        //        virtual void setSendBufferSize(int size, Dynamic cbSuccess, Dynamic cbFailure) = 0;
-        //        virtual void setRecvBufferSize(int size, Dynamic cbSuccess, Dynamic cbFailure) = 0;
+                virtual void setKeepAlive(bool keepAlive, Dynamic cbSuccess, Dynamic cbFailure) = 0;
+                virtual void setSendBufferSize(int size, Dynamic cbSuccess, Dynamic cbFailure) = 0;
+                virtual void setRecvBufferSize(int size, Dynamic cbSuccess, Dynamic cbFailure) = 0;*/
 
-        //        virtual void close(Dynamic cbSuccess, Dynamic cbFailure) = 0;
-        //    };
+                virtual void close(Dynamic cbSuccess, Dynamic cbFailure) = 0;
+            };
+        }
 
         //    class SecureSession_obj : public Object
         //    {
