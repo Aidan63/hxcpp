@@ -12,10 +12,10 @@ namespace
 		uv_write_t request;
 		uv_buf_t buffer;
 
-		WriteRequest(hx::ArrayPin* _pin, char* _base, int _length, Dynamic _cbSuccess, Dynamic _cbFailure)
+		WriteRequest(Dynamic _cbSuccess, Dynamic _cbFailure, std::unique_ptr<hx::ArrayPin> _pin, uv_buf_t _buffer)
 			: BaseRequest(_cbSuccess, _cbFailure)
-			, pin(_pin)
-			, buffer(uv_buf_init(_base, _length))
+			, pin(std::move(_pin))
+			, buffer(_buffer)
 		{
 			request.data = this;
 		}
@@ -35,23 +35,46 @@ namespace
 			}
 		}
 	};
+
+	class WriteWork final : public hx::asys::libuv::WorkRequest
+	{
+		uv_stream_t* stream;
+		std::unique_ptr<hx::ArrayPin> pin;
+		char* base;
+		int length;
+
+	public:
+		WriteWork(Dynamic _cbSuccess, Dynamic _cbFailure, uv_stream_t* _stream, hx::ArrayPin* _pin, char* _base, int _length)
+			: WorkRequest(_cbSuccess, _cbFailure)
+			, stream(_stream)
+			, pin(_pin)
+			, base(_base)
+			, length(_length) { }
+
+		void run(uv_loop_t* loop) override
+		{
+			auto request = std::make_unique<WriteRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(pin), uv_buf_init(base, length));
+			auto result  = uv_write(&request->request, stream, &request->buffer, 1, WriteRequest::callback);
+
+			if (result < 0)
+			{
+				Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+			}
+			else
+			{
+				request.release();
+			}
+		}
+	};
 }
 
 hx::asys::libuv::stream::StreamWriter_obj::StreamWriter_obj(uv_stream_t* stream) : stream(stream) {}
 
 void hx::asys::libuv::stream::StreamWriter_obj::write(Array<uint8_t> data, int offset, int length, Dynamic cbSuccess, Dynamic cbFailure)
 {
-	auto request = std::make_unique<WriteRequest>(data->Pin(), data->GetBase() + offset, length, cbSuccess, cbFailure);
-	auto result  = uv_write(&request->request, stream, &request->buffer, 1, WriteRequest::callback);
+	auto ctx = static_cast<LibuvAsysContext_obj::Ctx*>(stream->loop->data);
 
-	if (result < 0)
-	{
-		cbFailure(hx::asys::libuv::uv_err_to_enum(result));
-	}
-	else
-	{
-		request.release();
-	}
+	ctx->enqueue(std::make_unique<WriteWork>(cbSuccess, cbFailure, stream, data->Pin(), data->GetBase() + offset, length));
 }
 
 void hx::asys::libuv::stream::StreamWriter_obj::flush(Dynamic cbSuccess, Dynamic cbFailure)

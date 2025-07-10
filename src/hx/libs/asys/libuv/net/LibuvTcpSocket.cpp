@@ -154,43 +154,6 @@ namespace
 		}
 	};
 
-	void startConnection(
-		hx::asys::libuv::LibuvAsysContext _libuv,
-		std::function<std::unique_ptr<TcpConnectWork>(Dynamic, Dynamic, std::optional<int>, std::optional<int>, std::optional<int>)> _factory,
-		Dynamic _options,
-		Dynamic _cbSuccess,
-		Dynamic _cbFailure)
-	{
-		auto keepAlive  = std::optional<int>();
-		auto sendBuffer = std::optional<int>();
-		auto recvBuffer = std::optional<int>();
-
-		if (hx::IsNotNull(_options))
-		{
-			hx::Val found;
-
-			found = _options->__Field(HX_CSTRING("keepAlive"), hx::PropertyAccess::paccDynamic);
-			if (found.isBool())
-			{
-				keepAlive.emplace(found.asInt() ? hx::asys::libuv::net::KEEP_ALIVE_VALUE : 0);
-			}
-
-			found = _options->__Field(HX_CSTRING("sendBuffer"), hx::PropertyAccess::paccDynamic);
-			if (found.isBool())
-			{
-				sendBuffer.emplace(found.asInt());
-			}
-
-			found = _options->__Field(HX_CSTRING("recvBuffer"), hx::PropertyAccess::paccDynamic);
-			if (found.isBool())
-			{
-				recvBuffer.emplace(found.asInt());
-			}
-		}
-
-		_libuv->ctx->enqueue(_factory(_cbSuccess, _cbFailure, keepAlive, sendBuffer, recvBuffer));
-	}
-
 	/*void onAlloc(uv_handle_t* handle, const size_t suggested, uv_buf_t* buffer)
 	{
 		auto  ctx     = static_cast<hx::asys::libuv::net::LibuvTcpSocket::Ctx*>(handle->data);
@@ -242,17 +205,12 @@ namespace
 //			: hx::asys::libuv::net::LibuvTcpSocket::Ctx::onSuccess);
 //}
 
-
 hx::asys::libuv::net::LibuvTcpSocket::LibuvTcpSocket(uv_tcp_t* _tcp, ::hx::Anon _localAddress, ::hx::Anon _remoteAddress) : tcp(_tcp)
 {
 	HX_OBJ_WB_NEW_MARKED_OBJECT(this);
 
-	/*reader        = hx::asys::Readable(new hx::asys::libuv::stream::StreamReader_obj(&ctx->stream, onAlloc, onRead));
-	writer        = hx::asys::Writable(new hx::asys::libuv::stream::StreamWriter_obj(reinterpret_cast<uv_stream_t*>(&ctx->tcp)));*/
-	/*localAddress  = hx::asys::libuv::net::getLocalAddress(&ctx->tcp);
-	remoteAddress = hx::asys::libuv::net::getRemoteAddress(&ctx->tcp);*/
 	reader        = null();
-	writer        = null();
+	writer        = hx::asys::Writable(new hx::asys::libuv::stream::StreamWriter_obj(reinterpret_cast<uv_stream_t*>(tcp)));
 	localAddress  = _localAddress;
 	remoteAddress = _remoteAddress;
 }
