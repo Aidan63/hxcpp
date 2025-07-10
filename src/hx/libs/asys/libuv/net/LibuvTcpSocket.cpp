@@ -300,11 +300,23 @@ void hx::asys::libuv::net::LibuvTcpSocket::close(Dynamic cbSuccess, Dynamic cbFa
 		uv_tcp_t* tcp;
 
 	public:
+		uv_shutdown_t shutdown;
+
 		CloseRequest(Dynamic _cbSuccess, Dynamic _cbFailure, uv_tcp_t* _tcp)
 			: BaseRequest(_cbSuccess, _cbFailure)
-			, tcp(_tcp) { }
+			, tcp(_tcp)
+		{
+			shutdown.data = this;
+		}
 
-		static void onCallback(uv_handle_t* handle)
+		static void onShutdownCallback(uv_shutdown_t* shutdown, int status)
+		{
+			auto request = static_cast<CloseRequest*>(shutdown->data);
+
+			uv_close(reinterpret_cast<uv_handle_t*>(request->tcp), onCloseCallback);
+		}
+
+		static void onCloseCallback(uv_handle_t* handle)
 		{
 			auto tcp     = std::unique_ptr<uv_tcp_t>(reinterpret_cast<uv_tcp_t*>(handle));
 			auto request = std::unique_ptr<CloseRequest>(reinterpret_cast<CloseRequest*>(tcp->data));
@@ -323,7 +335,7 @@ void hx::asys::libuv::net::LibuvTcpSocket::close(Dynamic cbSuccess, Dynamic cbFa
 		void run(uv_loop_t* loop) override
 		{
 			auto request = std::make_unique<CloseRequest>(cbSuccess.rooted, cbFailure.rooted, tcp);
-			auto result  = uv_tcp_close_reset(tcp, CloseRequest::onCallback);
+			auto result  = uv_shutdown(&request->shutdown, reinterpret_cast<uv_stream_t*>(tcp), CloseRequest::onShutdownCallback);
 			if (result < 0)
 			{
 				Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
