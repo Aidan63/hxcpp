@@ -180,37 +180,12 @@ namespace
 	}
 }
 
-//void hx::asys::libuv::net::LibuvTcpSocket::Ctx::onSuccess(uv_handle_t* handle)
-//{
-//	auto spData = std::unique_ptr<Ctx>(reinterpret_cast<Ctx*>(handle->data));
-//	auto gcZone = hx::AutoGCZone();
-//
-//	Dynamic(spData->cbSuccess.rooted)();
-//}
-//
-//void hx::asys::libuv::net::LibuvTcpSocket::Ctx::onFailure(uv_handle_t* handle)
-//{
-//	auto spData = std::unique_ptr<Ctx>(reinterpret_cast<Ctx*>(handle->data));
-//	auto gcZone = hx::AutoGCZone();
-//
-//	Dynamic(spData->cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(spData->status));
-//}
-//
-//void hx::asys::libuv::net::LibuvTcpSocket::Ctx::onShutdown(uv_shutdown_t* handle, int status)
-//{
-//	uv_close(
-//		reinterpret_cast<uv_handle_t*>(handle->handle),
-//		status < 0
-//			? hx::asys::libuv::net::LibuvTcpSocket::Ctx::onFailure
-//			: hx::asys::libuv::net::LibuvTcpSocket::Ctx::onSuccess);
-//}
-
 hx::asys::libuv::net::LibuvTcpSocket::LibuvTcpSocket(std::unique_ptr<uv_tcp_t> _tcp, ::hx::Anon _localAddress, ::hx::Anon _remoteAddress)
-	: ctx(new Ctx(std::move(_tcp)))
+	: ctx(new Ctx(std::move(_tcp), onAlloc, onRead))
 {
 	HX_OBJ_WB_NEW_MARKED_OBJECT(this);
 
-	reader        = hx::asys::Readable(new hx::asys::libuv::stream::StreamReader_obj(ctx->stream, onAlloc, onRead));
+	reader        = hx::asys::Readable(new hx::asys::libuv::stream::StreamReader_obj(ctx->stream));
 	writer        = hx::asys::Writable(new hx::asys::libuv::stream::StreamWriter_obj(reinterpret_cast<uv_stream_t*>(ctx->tcp.get())));
 	localAddress  = _localAddress;
 	remoteAddress = _remoteAddress;
@@ -458,9 +433,9 @@ void hx::asys::net::TcpSocket_obj::connect_ipv6(Context ctx, const String host, 
 	}*/
 }
 
-hx::asys::libuv::net::LibuvTcpSocket::Ctx::Ctx(std::unique_ptr<uv_tcp_t> _tcp)
+hx::asys::libuv::net::LibuvTcpSocket::Ctx::Ctx(std::unique_ptr<uv_tcp_t> _tcp, uv_alloc_cb _cbAlloc, uv_read_cb _cbRead)
 	: tcp(std::move(_tcp))
-	, stream(reinterpret_cast<uv_stream_t*>(tcp.get()))
+	, stream(reinterpret_cast<uv_stream_t*>(tcp.get()), _cbAlloc, _cbRead)
 {
 	tcp->data = this;
 }

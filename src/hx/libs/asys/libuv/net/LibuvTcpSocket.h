@@ -18,7 +18,7 @@ namespace hx::asys::libuv::net
 			std::atomic_bool closed;
 			hx::asys::libuv::stream::StreamReader_obj::Ctx stream;
 
-			Ctx(std::unique_ptr<uv_tcp_t> _tcp);
+			Ctx(std::unique_ptr<uv_tcp_t> _tcp, uv_alloc_cb _cbAlloc, uv_read_cb _cbRead);
 		};
 
 		Ctx* ctx;

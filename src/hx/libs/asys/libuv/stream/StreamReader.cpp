@@ -1,8 +1,10 @@
 #include <hxcpp.h>
 #include "StreamReader.h"
 
-hx::asys::libuv::stream::StreamReader_obj::Ctx::Ctx(uv_stream_t* stream)
-    : stream(stream)
+hx::asys::libuv::stream::StreamReader_obj::Ctx::Ctx(uv_stream_t* _stream, uv_alloc_cb _cbAlloc, uv_read_cb _cbRead)
+    : stream(_stream)
+    , cbAlloc(_cbAlloc)
+    , cbRead(_cbRead)
     , queue()
     , staging()
     , buffer()
@@ -53,31 +55,52 @@ hx::asys::libuv::stream::StreamReader_obj::QueuedRead::QueuedRead(const Array<ui
 {
 }
 
-hx::asys::libuv::stream::StreamReader_obj::StreamReader_obj(Ctx& _ctx, uv_alloc_cb _cbAlloc, uv_read_cb _cbRead)
-    : ctx(_ctx)
-    , cbAlloc(_cbAlloc)
-    , cbRead(_cbRead) {}
+hx::asys::libuv::stream::StreamReader_obj::StreamReader_obj(Ctx& _ctx)
+    : ctx(_ctx) {}
 
 void hx::asys::libuv::stream::StreamReader_obj::read(Array<uint8_t> output, int offset, int length, Dynamic cbSuccess, Dynamic cbFailure)
 {
-    if (ctx.queue.empty())
+    class ReadWork final : public hx::asys::libuv::WorkRequest
     {
-        if (!ctx.buffer.empty())
+        Ctx& ctx;
+        const hx::RootedObject<Array_obj<uint8_t>> array;
+        const int offset;
+        const int length;
+
+    public:
+        ReadWork(Dynamic _cbSuccess, Dynamic _cbFailure, Ctx& _ctx, Array<uint8_t> _output, int _offset, int _length)
+            : WorkRequest(_cbSuccess, _cbFailure)
+            , ctx(_ctx)
+            , array(_output.mPtr)
+            , offset(_offset)
+            , length(_length) {}
+
+        void run(uv_loop_t* loop) override
         {
-            ctx.queue.emplace_back(output, offset, length, cbSuccess, cbFailure);
-            ctx.consume();
+            if (ctx.queue.empty())
+            {
+                if (!ctx.buffer.empty())
+                {
+                    ctx.queue.emplace_back(array.rooted, offset, length, cbSuccess.rooted, cbFailure.rooted);
+                    ctx.consume();
 
-            return;
+                    return;
+                }
+
+                auto result = uv_read_start(ctx.stream, ctx.cbAlloc, ctx.cbRead);
+                if (result < 0 && result != UV_EALREADY)
+                {
+                    Dynamic(cbFailure.rooted)(uv_err_to_enum(result));
+
+                    return;
+                }
+            }
+
+            ctx.queue.emplace_back(array.rooted, offset, length, cbSuccess.rooted, cbFailure.rooted);
         }
+    };
 
-        auto result = uv_read_start(ctx.stream, cbAlloc, cbRead);
-        if (result < 0 && result != UV_EALREADY)
-        {
-            cbFailure(uv_err_to_enum(result));
+    auto libuv = static_cast<hx::asys::libuv::LibuvAsysContext_obj::Ctx*>(ctx.stream->loop->data);
 
-            return;
-        }
-    }
-
-    ctx.queue.emplace_back(output, offset, length, cbSuccess, cbFailure);
+    libuv->enqueue(std::make_unique<ReadWork>(cbSuccess, cbFailure, ctx, output, offset, length));
 }

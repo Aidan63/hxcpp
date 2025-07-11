@@ -11,15 +11,12 @@ namespace hx::asys::libuv::stream
 {
     class StreamReader_obj : public hx::asys::Readable_obj
     {
-        uv_alloc_cb cbAlloc;
-        uv_read_cb cbRead;
-
     public:
         struct QueuedRead final : BaseRequest
         {
-            const hx::RootedObject<Array_obj<uint8_t>> array;
-            const int offset;
-            const int length;
+            hx::RootedObject<Array_obj<uint8_t>> array;
+            int offset;
+            int length;
 
             QueuedRead(const Array<uint8_t> _array, const int _offset, const int _length, const Dynamic _cbSuccess, const Dynamic _cbFailure);
         };
@@ -31,7 +28,10 @@ namespace hx::asys::libuv::stream
             std::vector<std::vector<char>> staging;
             std::vector<char> buffer;
 
-            Ctx(uv_stream_t* stream);
+            uv_alloc_cb cbAlloc;
+            uv_read_cb cbRead;
+
+            Ctx(uv_stream_t* _stream, uv_alloc_cb _cbAlloc, uv_read_cb _cbRead);
 
             void consume();
             void reject(int code);
@@ -39,7 +39,7 @@ namespace hx::asys::libuv::stream
 
         Ctx& ctx;
 
-        StreamReader_obj(Ctx& ctx, uv_alloc_cb cbAlloc, uv_read_cb cbRead);
+        StreamReader_obj(Ctx& ctx);
 
         void read(Array<uint8_t> output, int offset, int length, Dynamic cbSuccess, Dynamic cbFailure) override;
     };
