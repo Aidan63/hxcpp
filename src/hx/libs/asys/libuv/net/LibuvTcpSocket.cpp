@@ -79,7 +79,7 @@ namespace
 				return;
 			}
 
-			Dynamic(request->cbSuccess.rooted)(new hx::asys::libuv::net::LibuvTcpSocket(request->tcp.release(), local, remote));
+			Dynamic(request->cbSuccess.rooted)(new hx::asys::libuv::net::LibuvTcpSocket(std::move(request->tcp), local, remote));
 		}
 	};
 
@@ -154,7 +154,7 @@ namespace
 		}
 	};
 
-	/*void onAlloc(uv_handle_t* handle, const size_t suggested, uv_buf_t* buffer)
+	void onAlloc(uv_handle_t* handle, const size_t suggested, uv_buf_t* buffer)
 	{
 		auto  ctx     = static_cast<hx::asys::libuv::net::LibuvTcpSocket::Ctx*>(handle->data);
 		auto& staging = ctx->stream.staging.emplace_back(suggested);
@@ -177,7 +177,7 @@ namespace
 
 		ctx->stream.buffer.insert(ctx->stream.buffer.end(), read->base, read->base + len);
 		ctx->stream.consume();
-	}*/
+	}
 }
 
 //void hx::asys::libuv::net::LibuvTcpSocket::Ctx::onSuccess(uv_handle_t* handle)
@@ -205,12 +205,13 @@ namespace
 //			: hx::asys::libuv::net::LibuvTcpSocket::Ctx::onSuccess);
 //}
 
-hx::asys::libuv::net::LibuvTcpSocket::LibuvTcpSocket(uv_tcp_t* _tcp, ::hx::Anon _localAddress, ::hx::Anon _remoteAddress) : tcp(_tcp)
+hx::asys::libuv::net::LibuvTcpSocket::LibuvTcpSocket(std::unique_ptr<uv_tcp_t> _tcp, ::hx::Anon _localAddress, ::hx::Anon _remoteAddress)
+	: ctx(new Ctx(std::move(_tcp)))
 {
 	HX_OBJ_WB_NEW_MARKED_OBJECT(this);
 
-	reader        = null();
-	writer        = hx::asys::Writable(new hx::asys::libuv::stream::StreamWriter_obj(reinterpret_cast<uv_stream_t*>(tcp)));
+	reader        = hx::asys::Readable(new hx::asys::libuv::stream::StreamReader_obj(ctx->stream, onAlloc, onRead));
+	writer        = hx::asys::Writable(new hx::asys::libuv::stream::StreamWriter_obj(reinterpret_cast<uv_stream_t*>(ctx->tcp.get())));
 	localAddress  = _localAddress;
 	remoteAddress = _remoteAddress;
 }
@@ -297,28 +298,28 @@ void hx::asys::libuv::net::LibuvTcpSocket::close(Dynamic cbSuccess, Dynamic cbFa
 {
 	class CloseRequest final : public hx::asys::libuv::BaseRequest
 	{
-		uv_tcp_t* tcp;
-
 	public:
+		std::unique_ptr<uv_tcp_t> tcp;
+
 		uv_shutdown_t shutdown;
 
-		CloseRequest(Dynamic _cbSuccess, Dynamic _cbFailure, uv_tcp_t* _tcp)
+		CloseRequest(Dynamic _cbSuccess, Dynamic _cbFailure, std::unique_ptr<uv_tcp_t> _tcp)
 			: BaseRequest(_cbSuccess, _cbFailure)
-			, tcp(_tcp)
+			, tcp(std::move(_tcp))
 		{
-			shutdown.data = this;
+			tcp->data = shutdown.data = this;
 		}
 
 		static void onShutdownCallback(uv_shutdown_t* shutdown, int status)
 		{
 			auto request = static_cast<CloseRequest*>(shutdown->data);
 
-			uv_close(reinterpret_cast<uv_handle_t*>(request->tcp), onCloseCallback);
+			uv_close(reinterpret_cast<uv_handle_t*>(request->tcp.get()), onCloseCallback);
 		}
 
 		static void onCloseCallback(uv_handle_t* handle)
 		{
-			auto tcp     = std::unique_ptr<uv_tcp_t>(reinterpret_cast<uv_tcp_t*>(handle));
+			auto tcp     = reinterpret_cast<uv_tcp_t*>(handle);
 			auto request = std::unique_ptr<CloseRequest>(reinterpret_cast<CloseRequest*>(tcp->data));
 
 			Dynamic(request->cbSuccess.rooted)();
@@ -327,37 +328,37 @@ void hx::asys::libuv::net::LibuvTcpSocket::close(Dynamic cbSuccess, Dynamic cbFa
 
 	class CloseWork final : public hx::asys::libuv::WorkRequest
 	{
-		uv_tcp_t* tcp;
+		std::unique_ptr<uv_tcp_t> tcp;
 
 	public:
-		CloseWork(Dynamic _cbSuccess, Dynamic _cbFailure, uv_tcp_t* _tcp) : WorkRequest(_cbSuccess, _cbFailure), tcp(_tcp) {}
+		CloseWork(Dynamic _cbSuccess, Dynamic _cbFailure, std::unique_ptr<uv_tcp_t> _tcp) : WorkRequest(_cbSuccess, _cbFailure), tcp(std::move(_tcp)) {}
 
 		void run(uv_loop_t* loop) override
 		{
-			auto request = std::make_unique<CloseRequest>(cbSuccess.rooted, cbFailure.rooted, tcp);
-			auto result  = uv_shutdown(&request->shutdown, reinterpret_cast<uv_stream_t*>(tcp), CloseRequest::onShutdownCallback);
+			auto request = std::make_unique<CloseRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(tcp));
+			auto result  = uv_shutdown(&request->shutdown, reinterpret_cast<uv_stream_t*>(request->tcp.get()), CloseRequest::onShutdownCallback);
 			if (result < 0)
 			{
 				Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
 			}
 			else
 			{
-				tcp->data = request.release();
+				request.release();
 			}
 		}
 	};
 
 	auto expected = false;
-	if (false == closed.compare_exchange_strong(expected, true))
+	if (false == ctx->closed.compare_exchange_strong(expected, true))
 	{
 		cbSuccess();
 
 		return;
 	}
 
-	auto ctx = static_cast<LibuvAsysContext_obj::Ctx*>(tcp->loop->data);
+	auto libuv = static_cast<LibuvAsysContext_obj::Ctx*>(ctx->tcp->loop->data);
 
-	ctx->enqueue(std::move(std::make_unique<CloseWork>(cbSuccess.mPtr, cbFailure.mPtr, tcp)));
+	libuv->enqueue(std::move(std::make_unique<CloseWork>(cbSuccess.mPtr, cbFailure.mPtr, std::move(ctx->tcp))));
 }
 
 void hx::asys::libuv::net::LibuvTcpSocket::__Mark(hx::MarkContext* __inCtx)
@@ -455,4 +456,11 @@ void hx::asys::net::TcpSocket_obj::connect_ipv6(Context ctx, const String host, 
 	{
 		startConnection(hx::asys::libuv::context(ctx), reinterpret_cast<sockaddr*>(&address), options, cbSuccess, cbFailure);
 	}*/
+}
+
+hx::asys::libuv::net::LibuvTcpSocket::Ctx::Ctx(std::unique_ptr<uv_tcp_t> _tcp)
+	: tcp(std::move(_tcp))
+	, stream(reinterpret_cast<uv_stream_t*>(tcp.get()))
+{
+	tcp->data = this;
 }

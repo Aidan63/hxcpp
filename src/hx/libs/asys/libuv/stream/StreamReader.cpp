@@ -53,24 +53,24 @@ hx::asys::libuv::stream::StreamReader_obj::QueuedRead::QueuedRead(const Array<ui
 {
 }
 
-hx::asys::libuv::stream::StreamReader_obj::StreamReader_obj(Ctx* ctx, uv_alloc_cb cbAlloc, uv_read_cb cbRead)
-    : ctx(ctx)
-    , cbAlloc(cbAlloc)
-    , cbRead(cbRead) {}
+hx::asys::libuv::stream::StreamReader_obj::StreamReader_obj(Ctx& _ctx, uv_alloc_cb _cbAlloc, uv_read_cb _cbRead)
+    : ctx(_ctx)
+    , cbAlloc(_cbAlloc)
+    , cbRead(_cbRead) {}
 
 void hx::asys::libuv::stream::StreamReader_obj::read(Array<uint8_t> output, int offset, int length, Dynamic cbSuccess, Dynamic cbFailure)
 {
-    if (ctx->queue.empty())
+    if (ctx.queue.empty())
     {
-        if (!ctx->buffer.empty())
+        if (!ctx.buffer.empty())
         {
-            ctx->queue.emplace_back(output, offset, length, cbSuccess, cbFailure);
-            ctx->consume();
+            ctx.queue.emplace_back(output, offset, length, cbSuccess, cbFailure);
+            ctx.consume();
 
             return;
         }
 
-        auto result = uv_read_start(ctx->stream, cbAlloc, cbRead);
+        auto result = uv_read_start(ctx.stream, cbAlloc, cbRead);
         if (result < 0 && result != UV_EALREADY)
         {
             cbFailure(uv_err_to_enum(result));
@@ -79,5 +79,5 @@ void hx::asys::libuv::stream::StreamReader_obj::read(Array<uint8_t> output, int 
         }
     }
 
-    ctx->queue.emplace_back(output, offset, length, cbSuccess, cbFailure);
+    ctx.queue.emplace_back(output, offset, length, cbSuccess, cbFailure);
 }

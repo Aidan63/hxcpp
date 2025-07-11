@@ -12,10 +12,18 @@ namespace hx::asys::libuv::net
 	class LibuvTcpSocket final : public hx::asys::net::TcpSocket_obj
 	{
 	public:
-		uv_tcp_t* tcp;
-		std::atomic_bool closed;
+		struct Ctx
+		{
+			std::unique_ptr<uv_tcp_t> tcp;
+			std::atomic_bool closed;
+			hx::asys::libuv::stream::StreamReader_obj::Ctx stream;
 
-		LibuvTcpSocket(uv_tcp_t* _tcp, ::hx::Anon _localAddress, ::hx::Anon _remoteAddress);
+			Ctx(std::unique_ptr<uv_tcp_t> _tcp);
+		};
+
+		Ctx* ctx;
+
+		LibuvTcpSocket(std::unique_ptr<uv_tcp_t> _tcp, ::hx::Anon _localAddress, ::hx::Anon _remoteAddress);
 
 		//void getKeepAlive(Dynamic cbSuccess, Dynamic cbFailure) override;
 		//void getSendBufferSize(Dynamic cbSuccess, Dynamic cbFailure) override;
