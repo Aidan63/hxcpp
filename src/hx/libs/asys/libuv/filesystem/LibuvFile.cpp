@@ -132,6 +132,7 @@ void hx::asys::filesystem::File_obj::open(Context ctx, String path, int flags, D
 
         void run(uv_loop_t* loop) override
         {
+            auto gcZone  = hx::AutoGCZone();
             auto request = std::make_unique<FileOpenRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(pathBuffer));
             auto result  = uv_fs_open(loop, &request->uv, path, flags, mode, onOpenCallback);
             if (result < 0)
@@ -162,6 +163,7 @@ void hx::asys::filesystem::File_obj::temp(Context ctx, Dynamic cbSuccess, Dynami
 
         void run(uv_loop_t* loop) override
         {
+            auto gcZone  = hx::AutoGCZone();
             auto request = std::make_unique<hx::asys::libuv::filesystem::FsRequest>(cbSuccess.rooted, cbFailure.rooted);
             auto result  = uv_fs_mkstemp(loop, &request->uv, path.string().c_str(), onOpenCallback);
             if (result < 0)
@@ -225,6 +227,7 @@ void hx::asys::filesystem::File_obj::info(Context ctx, String path, Dynamic cbSu
 
         void run(uv_loop_t* loop) override
         {
+            auto gcZone  = hx::AutoGCZone();
             auto request = std::make_unique<InfoRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(buffer));
             auto result  = uv_fs_stat(loop, &request->uv, path, onStatCallback);
             if (result < 0)
@@ -289,6 +292,7 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::write(::cpp::Int64 pos, Array<u
 
         void run(uv_loop_t* loop) override
         {
+            auto gcZone  = hx::AutoGCZone();
             auto request = std::make_unique<WriteRequest>(std::move(pin), offset, length, cbSuccess.rooted, cbFailure.rooted);
             auto result  = uv_fs_write(loop, &request->uv, file, &request->buffer, 1, pos, FsRequest::callback);
             if (result < 0)
@@ -345,6 +349,7 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::read(::cpp::Int64 pos, Array<ui
 
         void run(uv_loop_t* loop) override
         {
+            auto gcZone  = hx::AutoGCZone();
             auto request = std::make_unique<ReadRequest>(std::move(pin), offset, length, cbSuccess.rooted, cbFailure.rooted);
             auto result  = uv_fs_read(loop, &request->uv, file, &request->buffer, 1, pos, FsRequest::callback);
             if (result < 0)
@@ -379,6 +384,7 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::info(Dynamic cbSuccess, Dynamic
 
         void run(uv_loop_t* loop) override
         {
+            auto gcZone  = hx::AutoGCZone();
             auto request = std::make_unique<hx::asys::libuv::filesystem::FsRequest>(cbSuccess.rooted, cbFailure.rooted);
             auto result  = uv_fs_fstat(loop, &request->uv, file, onStatCallback);
             if (result < 0)
@@ -412,6 +418,7 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::resize(int size, Dynamic cbSucc
 
         void run(uv_loop_t* loop) override
         {
+            auto gcZone  = hx::AutoGCZone();
             auto request = std::make_unique<FsRequest>(cbSuccess.rooted, cbFailure.rooted);
             auto result  = uv_fs_ftruncate(loop, &request->uv, file, size, FsRequest::callback);
             if (result < 0)
@@ -445,6 +452,7 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::setPermissions(int permissions,
 
         void run(uv_loop_t* loop) override
         {
+            auto gcZone  = hx::AutoGCZone();
             auto request = std::make_unique<FsRequest>(cbSuccess.rooted, cbFailure.rooted);
             auto result  = uv_fs_fchmod(loop, &request->uv, file, permissions, FsRequest::callback);
             if (result < 0)
@@ -480,6 +488,7 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::setOwner(int user, int group, D
 
         void run(uv_loop_t* loop) override
         {
+            auto gcZone  = hx::AutoGCZone();
             auto request = std::make_unique<FsRequest>(cbSuccess.rooted, cbFailure.rooted);
             auto result  = uv_fs_fchown(loop, &request->uv, file, user, group, FsRequest::callback);
             if (result < 0)
@@ -515,6 +524,7 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::setTimes(int accessTime, int mo
 
         void run(uv_loop_t* loop) override
         {
+            auto gcZone  = hx::AutoGCZone();
             auto request = std::make_unique<FsRequest>(cbSuccess.rooted, cbFailure.rooted);
             auto result  = uv_fs_futime(loop, &request->uv, file, accessTime, modificationTime, FsRequest::callback);
             if (result < 0)
@@ -544,6 +554,7 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::flush(Dynamic cbSuccess, Dynami
 
         void run(uv_loop_t* loop) override
         {
+            auto gcZone  = hx::AutoGCZone();
             auto request = std::make_unique<FsRequest>(cbSuccess.rooted, cbFailure.rooted);
             auto result  = uv_fs_fsync(loop, &request->uv, file, FsRequest::callback);
             if (result < 0)
@@ -573,6 +584,7 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::close(Dynamic cbSuccess, Dynami
 
         void run(uv_loop_t* loop) override
         {
+            auto gcZone  = hx::AutoGCZone();
             auto request = std::make_unique<FsRequest>(cbSuccess.rooted, cbFailure.rooted);
             auto result  = uv_fs_close(loop, &request->uv, file, FsRequest::callback);
             if (result < 0)

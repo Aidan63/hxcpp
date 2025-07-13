@@ -112,6 +112,7 @@ namespace
 
                 void run(uv_loop_t* loop) override
                 {
+                    auto gcZone  = hx::AutoGCZone();
                     auto request = std::make_unique<NextRequest>(cbSuccess.rooted, cbFailure.rooted, batch);
                     dir->nentries = request->entries.capacity();
                     dir->dirents  = request->entries.data();
@@ -144,6 +145,7 @@ namespace
 
                 void run(uv_loop_t* loop) override
                 {
+                    auto gcZone  = hx::AutoGCZone();
                     auto request = std::make_unique<hx::asys::libuv::filesystem::FsRequest>(cbSuccess.rooted, cbFailure.rooted);
                     auto result  = uv_fs_closedir(loop, &request->uv, dir, hx::asys::libuv::filesystem::FsRequest::callback);
                     if (result < 0)
@@ -213,6 +215,7 @@ void hx::asys::filesystem::Directory_obj::open(Context ctx, String path, Dynamic
 
         void run(uv_loop_t* loop) override
         {
+            auto gcZone  = hx::AutoGCZone();
             auto request = std::make_unique<OpenRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(pathBuffer));
             auto result  = uv_fs_opendir(loop, &request->uv, path, OpenRequest::onCallback);
             if (result < 0)
@@ -261,6 +264,7 @@ void hx::asys::filesystem::Directory_obj::create(Context ctx, String path, int p
 
         void run(uv_loop_t* loop) override
         {
+            auto gcZone  = hx::AutoGCZone();
             auto request = std::make_unique<CreateRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(pathBuffer));
             auto result  = uv_fs_mkdir(loop, &request->uv, path, flags, hx::asys::libuv::filesystem::FsRequest::callback);
             if (result < 0)
@@ -312,6 +316,7 @@ void hx::asys::filesystem::Directory_obj::rename(Context ctx, String oldPath, St
 
         void run(uv_loop_t* loop) override
         {
+            auto gcZone  = hx::AutoGCZone();
             auto request = std::make_unique<RenameRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(oldPathBuffer), std::move(newPathBuffer));
             auto result  = uv_fs_rename(loop, &request->uv, oldPath, newPath, hx::asys::libuv::filesystem::FsRequest::callback);
             if (result < 0)
@@ -380,6 +385,7 @@ void hx::asys::filesystem::Directory_obj::check(Context ctx, String path, FileAc
 
         void run(uv_loop_t* loop) override
         {
+            auto gcZone  = hx::AutoGCZone();
             auto request = std::make_unique<CheckRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(pathBuffer));
             auto result  = uv_fs_access(loop, &request->uv, path, flags, CheckRequest::onCallback);
             if (result < 0)
@@ -444,6 +450,7 @@ void hx::asys::filesystem::Directory_obj::deleteFile(Context ctx, String path, D
 
         void run(uv_loop_t* loop) override
         {
+            auto gcZone  = hx::AutoGCZone();
             auto request = std::make_unique<DeleteFileRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(pathBuffer));
             auto result  = uv_fs_unlink(loop, &request->uv, path, hx::asys::libuv::filesystem::FsRequest::callback);
             if (result < 0)
@@ -491,6 +498,7 @@ void hx::asys::filesystem::Directory_obj::deleteDirectory(Context ctx, String pa
 
         void run(uv_loop_t* loop) override
         {
+            auto gcZone  = hx::AutoGCZone();
             auto request = std::make_unique<DeleteDirectoryRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(pathBuffer));
             auto result  = uv_fs_rmdir(loop, &request->uv, path, hx::asys::libuv::filesystem::FsRequest::callback);
             if (result < 0)
@@ -538,6 +546,7 @@ void hx::asys::filesystem::Directory_obj::isDirectory(Context ctx, String path, 
 
         void run(uv_loop_t* loop) override
         {
+            auto gcZone  = hx::AutoGCZone();
             auto request = std::make_unique<Request>(cbSuccess.rooted, cbFailure.rooted, std::move(pathBuffer));
             auto wrapper = [](uv_fs_t* request) { check_type_callback(S_IFDIR, request); };
             auto result  = uv_fs_stat(loop , &request->uv, path, wrapper);
@@ -586,6 +595,7 @@ void hx::asys::filesystem::Directory_obj::isFile(Context ctx, String path, Dynam
 
         void run(uv_loop_t* loop) override
         {
+            auto gcZone  = hx::AutoGCZone();
             auto request = std::make_unique<Request>(cbSuccess.rooted, cbFailure.rooted, std::move(pathBuffer));
             auto wrapper = [](uv_fs_t* request) { check_type_callback(S_IFREG, request); };
             auto result  = uv_fs_stat(loop, &request->uv, path, wrapper);
@@ -634,6 +644,7 @@ void hx::asys::filesystem::Directory_obj::isLink(Context ctx, String path, Dynam
 
         void run(uv_loop_t* loop) override
         {
+            auto gcZone  = hx::AutoGCZone();
             auto request = std::make_unique<Request>(cbSuccess.rooted, cbFailure.rooted, std::move(pathBuffer));
             auto wrapper = [](uv_fs_t* request) { check_type_callback(S_IFLNK, request); };
             auto result  = uv_fs_stat(loop, &request->uv, path, wrapper);
@@ -684,6 +695,7 @@ void hx::asys::filesystem::Directory_obj::setLinkOwner(Context ctx, String path,
 
         void run(uv_loop_t* loop) override
         {
+            auto gcZone  = hx::AutoGCZone();
             auto request = std::make_unique<SetLinkOwnerRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(pathBuffer));
             auto result  = uv_fs_lchown(loop, &request->uv, path, user, group, hx::asys::libuv::filesystem::FsRequest::callback);
             if (result < 0)
@@ -737,6 +749,7 @@ void hx::asys::filesystem::Directory_obj::link(Context ctx, String target, Strin
 
         void run(uv_loop_t* loop) override
         {
+            auto gcZone  = hx::AutoGCZone();
             auto request = std::make_unique<LinkRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(targetBuffer), std::move(pathBuffer));
             auto result  = type == 0
                 ? uv_fs_link(loop, &request->uv, target, path, hx::asys::libuv::filesystem::FsRequest::callback)
@@ -818,6 +831,7 @@ void hx::asys::filesystem::Directory_obj::linkInfo(Context ctx, String path, Dyn
 
         void run(uv_loop_t* loop) override
         {
+            auto gcZone  = hx::AutoGCZone();
             auto request = std::make_unique<LinkInfoRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(pathBuffer));
             auto result  = uv_fs_lstat(loop, &request->uv, path, LinkInfoRequest::onCallback);
             if (result < 0)
@@ -865,6 +879,7 @@ void hx::asys::filesystem::Directory_obj::readLink(Context ctx, String path, Dyn
 
         void run(uv_loop_t* loop) override
         {
+            auto gcZone  = hx::AutoGCZone();
             auto request = std::make_unique<ReadLinkRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(pathBuffer));
             auto result  = uv_fs_readlink(loop, &request->uv, request->path, path_callback);
             if (result < 0)
@@ -916,6 +931,7 @@ void hx::asys::filesystem::Directory_obj::copyFile(Context ctx, String source, S
 
         void run(uv_loop_t* loop) override
         {
+            auto gcZone  = hx::AutoGCZone();
             auto request = std::make_unique<CopyFileRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(srcPathBuffer), std::move(dstPathBuffer));
             auto result  = uv_fs_rename(loop, &request->uv, srcPath, dstPath, hx::asys::libuv::filesystem::FsRequest::callback);
             if (result < 0)
@@ -963,6 +979,7 @@ void hx::asys::filesystem::Directory_obj::realPath(Context ctx, String path, Dyn
 
         void run(uv_loop_t* loop) override
         {
+            auto gcZone  = hx::AutoGCZone();
             auto request = std::make_unique<RealPathRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(pathBuffer));
             auto result  = uv_fs_realpath(loop, &request->uv, request->path, path_callback);
             if (result < 0)
