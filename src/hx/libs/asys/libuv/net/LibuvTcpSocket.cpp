@@ -60,7 +60,7 @@ namespace
 
 				return;
 			}
-			
+
 			int result;
 
 			::hx::Anon local;
@@ -102,7 +102,8 @@ namespace
 		void run(uv_loop_t* loop) override final
 		{
 			auto result = 0;
-			auto tcp = std::make_unique<uv_tcp_t>();
+			auto tcp    = std::make_unique<uv_tcp_t>();
+			auto gcZone = hx::AutoGCZone();
 
 			if ((result = uv_tcp_init(loop, tcp.get())) < 0)
 			{
@@ -295,6 +296,7 @@ void hx::asys::libuv::net::LibuvTcpSocket::close(Dynamic cbSuccess, Dynamic cbFa
 		static void onCloseCallback(uv_handle_t* handle)
 		{
 			auto tcp     = reinterpret_cast<uv_tcp_t*>(handle);
+			auto gcZone  = hx::AutoGCZone();
 			auto request = std::unique_ptr<CloseRequest>(reinterpret_cast<CloseRequest*>(tcp->data));
 
 			Dynamic(request->cbSuccess.rooted)();
@@ -310,10 +312,12 @@ void hx::asys::libuv::net::LibuvTcpSocket::close(Dynamic cbSuccess, Dynamic cbFa
 
 		void run(uv_loop_t* loop) override
 		{
+			auto gcZone  = hx::AutoGCZone();
 			auto request = std::make_unique<CloseRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(tcp));
 			auto result  = uv_shutdown(&request->shutdown, reinterpret_cast<uv_stream_t*>(request->tcp.get()), CloseRequest::onShutdownCallback);
 			if (result < 0)
 			{
+
 				Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
 			}
 			else
@@ -333,7 +337,7 @@ void hx::asys::libuv::net::LibuvTcpSocket::close(Dynamic cbSuccess, Dynamic cbFa
 
 	auto libuv = static_cast<LibuvAsysContext_obj::Ctx*>(ctx->tcp->loop->data);
 
-	libuv->enqueue(std::move(std::make_unique<CloseWork>(cbSuccess.mPtr, cbFailure.mPtr, std::move(ctx->tcp))));
+	libuv->enqueue(std::make_unique<CloseWork>(cbSuccess.mPtr, cbFailure.mPtr, std::move(ctx->tcp)));
 }
 
 void hx::asys::libuv::net::LibuvTcpSocket::__Mark(hx::MarkContext* __inCtx)

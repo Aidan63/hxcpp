@@ -77,6 +77,8 @@ void hx::asys::libuv::stream::StreamReader_obj::read(Array<uint8_t> output, int 
 
         void run(uv_loop_t* loop) override
         {
+            auto gcZone = hx::AutoGCZone();
+
             if (ctx.queue.empty())
             {
                 if (!ctx.buffer.empty())

@@ -10,11 +10,13 @@ namespace hx::asys::libuv::net
 	class LibuvTcpServer final : public hx::asys::net::TcpServer_obj
 	{
 	public:
-		class ConnectionQueue final
+		class ConnectionQueue
 		{
 			std::deque<std::unique_ptr<hx::asys::libuv::BaseRequest>> queue;
 
 		public:
+			int existing;
+
 			ConnectionQueue();
 
 			void clear();
@@ -22,34 +24,28 @@ namespace hx::asys::libuv::net
 			std::unique_ptr<hx::asys::libuv::BaseRequest> tryDequeue();
 		};
 
-		class Ctx final : public BaseRequest
+		struct Ctx
 		{
-		public:
-			uv_tcp_t tcp;
+			std::unique_ptr<uv_tcp_t> tcp;
 			ConnectionQueue connections;
-			int keepAlive;
-			int status;
 
-			Ctx(Dynamic cbSuccess, Dynamic cbFailure, int keepAlive);
-
-			static void failure(uv_handle_t* handle);
-			static void success(uv_handle_t* handle);
+			Ctx(std::unique_ptr<uv_tcp_t> _tcp);
 		};
 
 		Ctx* ctx;
 
-		LibuvTcpServer(Ctx* _server);
+		LibuvTcpServer(Ctx* _server, ::hx::Anon _localAddress);
 
 		void accept(Dynamic cbSuccess, Dynamic cbFailure) override;
-		void close(Dynamic cbSuccess, Dynamic cbFailure) override;
+		//void close(Dynamic cbSuccess, Dynamic cbFailure) override;
 
-		void getKeepAlive(Dynamic cbSuccess, Dynamic cbFailure) override;
-		void getSendBufferSize(Dynamic cbSuccess, Dynamic cbFailure) override;
-		void getRecvBufferSize(Dynamic cbSuccess, Dynamic cbFailure) override;
+		//void getKeepAlive(Dynamic cbSuccess, Dynamic cbFailure) override;
+		//void getSendBufferSize(Dynamic cbSuccess, Dynamic cbFailure) override;
+		//void getRecvBufferSize(Dynamic cbSuccess, Dynamic cbFailure) override;
 
-		void setKeepAlive(bool keepAlive, Dynamic cbSuccess, Dynamic cbFailure) override;
-		void setSendBufferSize(int size, Dynamic cbSuccess, Dynamic cbFailure) override;
-		void setRecvBufferSize(int size, Dynamic cbSuccess, Dynamic cbFailure) override;
+		//void setKeepAlive(bool keepAlive, Dynamic cbSuccess, Dynamic cbFailure) override;
+		//void setSendBufferSize(int size, Dynamic cbSuccess, Dynamic cbFailure) override;
+		//void setRecvBufferSize(int size, Dynamic cbSuccess, Dynamic cbFailure) override;
 
 		void __Mark(hx::MarkContext* __inCtx) override;
 #ifdef HXCPP_VISIT_ALLOCS

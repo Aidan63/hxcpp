@@ -93,7 +93,6 @@ void hx::asys::libuv::LibuvAsysContext_obj::Ctx::consume(uv_async_t* async)
 {
     auto ctx   = static_cast<Ctx*>(async->data);
     auto guard = std::lock_guard(ctx->lock);
-    auto gc    = AutoGCZone();
 
     while (ctx->queue.empty() == false)
     {

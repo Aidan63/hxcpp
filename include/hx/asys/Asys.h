@@ -124,25 +124,25 @@ namespace hx
                 String name(const Ipv6Address ip);
             }
 
-            //class TcpServer_obj : public Object
-            //{
-            //public:
-            //    hx::Anon localAddress;
+            class TcpServer_obj : public Object
+            {
+            public:
+                hx::Anon localAddress;
 
-            //    static void open_ipv4(Context ctx, const String host, int port, Dynamic options, Dynamic cbSuccess, Dynamic cbFailure);
-            //    static void open_ipv6(Context ctx, const String host, int port, Dynamic options, Dynamic cbSuccess, Dynamic cbFailure);
+                static void open_ipv4(Context ctx, const String host, int port, Dynamic options, Dynamic cbSuccess, Dynamic cbFailure);
+                static void open_ipv6(Context ctx, const String host, int port, Dynamic options, Dynamic cbSuccess, Dynamic cbFailure);
 
-            //    virtual void accept(Dynamic cbSuccess, Dynamic cbFailure) = 0;
-            //    virtual void close(Dynamic cbSuccess, Dynamic cbFailure) = 0;
+                virtual void accept(Dynamic cbSuccess, Dynamic cbFailure) = 0;
+                //virtual void close(Dynamic cbSuccess, Dynamic cbFailure) = 0;
 
-            //    virtual void getKeepAlive(Dynamic cbSuccess, Dynamic cbFailure) = 0;
-            //    virtual void getSendBufferSize(Dynamic cbSuccess, Dynamic cbFailure) = 0;
-            //    virtual void getRecvBufferSize(Dynamic cbSuccess, Dynamic cbFailure) = 0;
+                //virtual void getKeepAlive(Dynamic cbSuccess, Dynamic cbFailure) = 0;
+                //virtual void getSendBufferSize(Dynamic cbSuccess, Dynamic cbFailure) = 0;
+                //virtual void getRecvBufferSize(Dynamic cbSuccess, Dynamic cbFailure) = 0;
 
-            //    virtual void setKeepAlive(bool keepAlive, Dynamic cbSuccess, Dynamic cbFailure) = 0;
-            //    virtual void setSendBufferSize(int size, Dynamic cbSuccess, Dynamic cbFailure) = 0;
-            //    virtual void setRecvBufferSize(int size, Dynamic cbSuccess, Dynamic cbFailure) = 0;
-            //};
+                //virtual void setKeepAlive(bool keepAlive, Dynamic cbSuccess, Dynamic cbFailure) = 0;
+                //virtual void setSendBufferSize(int size, Dynamic cbSuccess, Dynamic cbFailure) = 0;
+                //virtual void setRecvBufferSize(int size, Dynamic cbSuccess, Dynamic cbFailure) = 0;
+            };
 
             class TcpSocket_obj : public Object
             {
