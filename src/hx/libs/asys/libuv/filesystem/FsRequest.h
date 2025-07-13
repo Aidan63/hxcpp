@@ -12,18 +12,7 @@ namespace hx::asys::libuv::filesystem
     public:
         uv_fs_t uv;
 
-        const char* path;
-
-        FsRequest(Dynamic _cbSuccess, Dynamic _cbFailure)
-            : BaseRequest(_cbSuccess, _cbFailure)
-            , path(nullptr)
-        {
-            uv.data = this;
-        }
-
-        FsRequest(String _path, Dynamic _cbSuccess, Dynamic _cbFailure)
-            : BaseRequest(_cbSuccess, _cbFailure)
-            , path(_path.utf8_str(&buffer))
+        FsRequest(Dynamic _cbSuccess, Dynamic _cbFailure) : BaseRequest(_cbSuccess, _cbFailure)
         {
             uv.data = this;
         }

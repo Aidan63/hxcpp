@@ -881,7 +881,7 @@ void hx::asys::filesystem::Directory_obj::readLink(Context ctx, String path, Dyn
         {
             auto gcZone  = hx::AutoGCZone();
             auto request = std::make_unique<ReadLinkRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(pathBuffer));
-            auto result  = uv_fs_readlink(loop, &request->uv, request->path, path_callback);
+            auto result  = uv_fs_readlink(loop, &request->uv, path, path_callback);
             if (result < 0)
             {
                 Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
@@ -981,7 +981,7 @@ void hx::asys::filesystem::Directory_obj::realPath(Context ctx, String path, Dyn
         {
             auto gcZone  = hx::AutoGCZone();
             auto request = std::make_unique<RealPathRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(pathBuffer));
-            auto result  = uv_fs_realpath(loop, &request->uv, request->path, path_callback);
+            auto result  = uv_fs_realpath(loop, &request->uv, path, path_callback);
             if (result < 0)
             {
                 Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
