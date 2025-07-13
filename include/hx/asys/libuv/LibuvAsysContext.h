@@ -46,7 +46,20 @@ namespace hx::asys::libuv
 
             Ctx();
 
-            void enqueue(std::unique_ptr<WorkRequest> request);
+            template<class T, class... TArgs>
+            void emplace(TArgs&&... args)
+            {
+                auto guard = std::lock_guard(lock);
+
+                queue.emplace_back(new T(std::forward<TArgs>(args)...));
+
+                auto result = uv_async_send(&serialised);
+                if (result < 0)
+                {
+                    hx::CriticalError(String::create(uv_strerror(result)));
+                }
+            }
+
             void run();
 
             static void consume(uv_async_t*);

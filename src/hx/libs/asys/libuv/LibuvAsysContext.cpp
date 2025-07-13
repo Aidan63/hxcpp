@@ -104,19 +104,6 @@ void hx::asys::libuv::LibuvAsysContext_obj::Ctx::consume(uv_async_t* async)
     }
 }
 
-void hx::asys::libuv::LibuvAsysContext_obj::Ctx::enqueue(std::unique_ptr<WorkRequest> request)
-{
-    auto guard = std::lock_guard(lock);
-
-    queue.push_back(std::move(request));
-
-    auto result = uv_async_send(&serialised);
-    if (result < 0)
-    {
-        hx::CriticalError(String::create(uv_strerror(result)));
-    }
-}
-
 hx::asys::libuv::LibuvAsysContext_obj::LibuvAsysContext_obj(/*, hx::asys::system::CurrentProcess _process */)
     // : hx::asys::Context_obj()
     : ctx(new Ctx()) {}

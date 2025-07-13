@@ -221,7 +221,7 @@ void hx::asys::libuv::net::LibuvTcpServer::accept(Dynamic cbSuccess, Dynamic cbF
 
 	auto libuv = static_cast<LibuvAsysContext_obj::Ctx*>(ctx->tcp->loop->data);
 
-	libuv->enqueue(std::make_unique<AcceptWork>(cbSuccess, cbFailure, ctx));
+	libuv->emplace<AcceptWork>(cbSuccess, cbFailure, ctx);
 }
 
 //void hx::asys::libuv::net::LibuvTcpServer::getKeepAlive(Dynamic cbSuccess, Dynamic cbFailure)
@@ -364,8 +364,8 @@ void hx::asys::net::TcpServer_obj::open_ipv4(Context ctx, const String host, int
 	hx::strbuf buffer;
 
 	auto libuv  = hx::asys::libuv::context(ctx);
-	auto work   = std::make_unique<Ipv4OpenWork>(cbSuccess, cbFailure);
-	auto result = uv_ip4_addr(host.utf8_str(&buffer), port, &work->addr);
+	auto addr   = std::make_unique<sockaddr_in>();
+	auto result = uv_ip4_addr(host.utf8_str(&buffer), port, addr.get());
 
 	if (result < 0)
 	{
@@ -374,7 +374,7 @@ void hx::asys::net::TcpServer_obj::open_ipv4(Context ctx, const String host, int
 		return;
 	}
 
-	libuv->ctx->enqueue(std::move(work));
+	libuv->ctx->emplace<Ipv4OpenWork>(cbSuccess, cbFailure);
 }
 
 void hx::asys::net::TcpServer_obj::open_ipv6(Context ctx, const String host, int port, Dynamic options, Dynamic cbSuccess, Dynamic cbFailure)

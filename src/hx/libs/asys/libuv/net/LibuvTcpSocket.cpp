@@ -337,7 +337,7 @@ void hx::asys::libuv::net::LibuvTcpSocket::close(Dynamic cbSuccess, Dynamic cbFa
 
 	auto libuv = static_cast<LibuvAsysContext_obj::Ctx*>(ctx->tcp->loop->data);
 
-	libuv->enqueue(std::make_unique<CloseWork>(cbSuccess.mPtr, cbFailure.mPtr, std::move(ctx->tcp)));
+	libuv->emplace<CloseWork>(cbSuccess.mPtr, cbFailure.mPtr, std::move(ctx->tcp));
 }
 
 void hx::asys::libuv::net::LibuvTcpSocket::__Mark(hx::MarkContext* __inCtx)
@@ -364,14 +364,15 @@ void hx::asys::net::TcpSocket_obj::connect_ipv4(Context ctx, const String host, 
 	{
 		sockaddr* address() override
 		{
-			return reinterpret_cast<sockaddr*>(&addr);
+			return reinterpret_cast<sockaddr*>(addr.get());
 		}
 
 	public:
-		sockaddr_in addr;
+		std::unique_ptr<sockaddr_in> addr;
 
-		Ipv4TcpConnectWork(Dynamic _cbSuccess, Dynamic _cbFailure, std::optional<int> _keepAlive, std::optional<int> _sendBuffer, std::optional<int> _recvBuffer)
-			:TcpConnectWork(_cbSuccess, _cbFailure, _keepAlive, _sendBuffer, _recvBuffer)
+		Ipv4TcpConnectWork(Dynamic _cbSuccess, Dynamic _cbFailure, std::optional<int> _keepAlive, std::optional<int> _sendBuffer, std::optional<int> _recvBuffer, std::unique_ptr<sockaddr_in> _addr)
+			: TcpConnectWork(_cbSuccess, _cbFailure, _keepAlive, _sendBuffer, _recvBuffer)
+			, addr(std::move(_addr))
 		{
 			//
 		}
@@ -407,8 +408,8 @@ void hx::asys::net::TcpSocket_obj::connect_ipv4(Context ctx, const String host, 
 	hx::strbuf buffer;
 
 	auto libuv  = hx::asys::libuv::context(ctx);
-	auto work   = std::make_unique<Ipv4TcpConnectWork>(cbSuccess, cbFailure, keepAlive, sendBuffer, recvBuffer);
-	auto result = uv_ip4_addr(host.utf8_str(&buffer), port, &work->addr);
+	auto addr   = std::make_unique<sockaddr_in>();
+	auto result = uv_ip4_addr(host.utf8_str(&buffer), port, addr.get());
 
 	if (result < 0)
 	{
@@ -417,7 +418,7 @@ void hx::asys::net::TcpSocket_obj::connect_ipv4(Context ctx, const String host, 
 		return;
 	}
 	
-	libuv->ctx->enqueue(std::move(work));
+	libuv->ctx->emplace<Ipv4TcpConnectWork>(cbSuccess, cbFailure, keepAlive, sendBuffer, recvBuffer, std::move(addr));
 }
 
 void hx::asys::net::TcpSocket_obj::connect_ipv6(Context ctx, const String host, int port, Dynamic options, Dynamic cbSuccess, Dynamic cbFailure)

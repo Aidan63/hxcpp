@@ -131,7 +131,7 @@ namespace
 
             auto ctx = static_cast<hx::asys::libuv::LibuvAsysContext_obj::Ctx*>(loop->data);
 
-            ctx->enqueue(std::move(std::make_unique<NextWork>(cbSuccess.mPtr, cbFailure.mPtr, dir, batch)));
+            ctx->emplace<NextWork>(cbSuccess.mPtr, cbFailure.mPtr, dir, batch);
         }
 
         void close(Dynamic cbSuccess, Dynamic cbFailure) override
@@ -169,7 +169,7 @@ namespace
 
             auto ctx = static_cast<hx::asys::libuv::LibuvAsysContext_obj::Ctx*>(loop->data);
 
-            ctx->enqueue(std::move(std::make_unique<CloseWork>(cbSuccess.mPtr, cbFailure.mPtr, dir)));
+            ctx->emplace<CloseWork>(cbSuccess.mPtr, cbFailure.mPtr, dir);
         }
     };
 }
@@ -233,7 +233,7 @@ void hx::asys::filesystem::Directory_obj::open(Context ctx, String path, Dynamic
     auto pathBuffer = std::make_unique<hx::strbuf>();
     auto pathString = path.utf8_str(pathBuffer.get());
 
-    libuvCtx->ctx->enqueue(std::move(std::make_unique<OpenWork>(cbSuccess, cbFailure, std::move(pathBuffer), pathString)));
+    libuvCtx->ctx->emplace<OpenWork>(cbSuccess, cbFailure, std::move(pathBuffer), pathString);
 }
 
 void hx::asys::filesystem::Directory_obj::create(Context ctx, String path, int permissions, Dynamic cbSuccess, Dynamic cbFailure)
@@ -282,7 +282,7 @@ void hx::asys::filesystem::Directory_obj::create(Context ctx, String path, int p
     auto pathBuffer = std::make_unique<hx::strbuf>();
     auto pathString = path.utf8_str(pathBuffer.get());
 
-    libuvCtx->ctx->enqueue(std::move(std::make_unique<CreateWork>(cbSuccess, cbFailure, std::move(pathBuffer), pathString, permissions)));
+    libuvCtx->ctx->emplace<CreateWork>(cbSuccess, cbFailure, std::move(pathBuffer), pathString, permissions);
 }
 
 void hx::asys::filesystem::Directory_obj::rename(Context ctx, String oldPath, String newPath, Dynamic cbSuccess, Dynamic cbFailure)
@@ -336,7 +336,7 @@ void hx::asys::filesystem::Directory_obj::rename(Context ctx, String oldPath, St
     auto oldPathString = oldPath.utf8_str(oldPathBuffer.get());
     auto newPathString = newPath.utf8_str(newPathBuffer.get());
 
-    libuvCtx->ctx->enqueue(std::move(std::make_unique<RenameWork>(cbSuccess, cbFailure, std::move(oldPathBuffer), std::move(newPathBuffer), oldPathString, newPathString)));
+    libuvCtx->ctx->emplace<RenameWork>(cbSuccess, cbFailure, std::move(oldPathBuffer), std::move(newPathBuffer), oldPathString, newPathString);
 }
 
 void hx::asys::filesystem::Directory_obj::check(Context ctx, String path, FileAccessMode accessMode, Dynamic cbSuccess, Dynamic cbFailure)
@@ -421,7 +421,7 @@ void hx::asys::filesystem::Directory_obj::check(Context ctx, String path, FileAc
         mode |= R_OK;
     }
 
-    libuvCtx->ctx->enqueue(std::move(std::make_unique<CheckWork>(cbSuccess, cbFailure, std::move(pathBuffer), pathString, mode)));
+    libuvCtx->ctx->emplace<CheckWork>(cbSuccess, cbFailure, std::move(pathBuffer), pathString, mode);
 }
 
 void hx::asys::filesystem::Directory_obj::deleteFile(Context ctx, String path, Dynamic cbSuccess, Dynamic cbFailure)
@@ -468,7 +468,7 @@ void hx::asys::filesystem::Directory_obj::deleteFile(Context ctx, String path, D
     auto pathBuffer = std::make_unique<hx::strbuf>();
     auto pathString = path.utf8_str(pathBuffer.get());
 
-    libuvCtx->ctx->enqueue(std::move(std::make_unique<DeleteFileWork>(cbSuccess, cbFailure, std::move(pathBuffer), pathString)));
+    libuvCtx->ctx->emplace<DeleteFileWork>(cbSuccess, cbFailure, std::move(pathBuffer), pathString);
 }
 
 void hx::asys::filesystem::Directory_obj::deleteDirectory(Context ctx, String path, Dynamic cbSuccess, Dynamic cbFailure)
@@ -516,7 +516,7 @@ void hx::asys::filesystem::Directory_obj::deleteDirectory(Context ctx, String pa
     auto pathBuffer = std::make_unique<hx::strbuf>();
     auto pathString = path.utf8_str(pathBuffer.get());
 
-    libuvCtx->ctx->enqueue(std::move(std::make_unique<DeleteDirectoryWork>(cbSuccess, cbFailure, std::move(pathBuffer), pathString)));
+    libuvCtx->ctx->emplace<DeleteDirectoryWork>(cbSuccess, cbFailure, std::move(pathBuffer), pathString);
 }
 
 void hx::asys::filesystem::Directory_obj::isDirectory(Context ctx, String path, Dynamic cbSuccess, Dynamic cbFailure)
@@ -565,7 +565,7 @@ void hx::asys::filesystem::Directory_obj::isDirectory(Context ctx, String path, 
     auto pathBuffer = std::make_unique<hx::strbuf>();
     auto pathString = path.utf8_str(pathBuffer.get());
 
-    libuvCtx->ctx->enqueue(std::move(std::make_unique<Work>(cbSuccess, cbFailure, std::move(pathBuffer), pathString)));
+    libuvCtx->ctx->emplace<Work>(cbSuccess, cbFailure, std::move(pathBuffer), pathString);
 }
 
 void hx::asys::filesystem::Directory_obj::isFile(Context ctx, String path, Dynamic cbSuccess, Dynamic cbFailure)
@@ -614,7 +614,7 @@ void hx::asys::filesystem::Directory_obj::isFile(Context ctx, String path, Dynam
     auto pathBuffer = std::make_unique<hx::strbuf>();
     auto pathString = path.utf8_str(pathBuffer.get());
 
-    libuvCtx->ctx->enqueue(std::move(std::make_unique<Work>(cbSuccess, cbFailure, std::move(pathBuffer), pathString)));
+    libuvCtx->ctx->emplace<Work>(cbSuccess, cbFailure, std::move(pathBuffer), pathString);
 }
 
 void hx::asys::filesystem::Directory_obj::isLink(Context ctx, String path, Dynamic cbSuccess, Dynamic cbFailure)
@@ -663,7 +663,7 @@ void hx::asys::filesystem::Directory_obj::isLink(Context ctx, String path, Dynam
     auto pathBuffer = std::make_unique<hx::strbuf>();
     auto pathString = path.utf8_str(pathBuffer.get());
 
-    libuvCtx->ctx->enqueue(std::move(std::make_unique<Work>(cbSuccess, cbFailure, std::move(pathBuffer), pathString)));
+    libuvCtx->ctx->emplace<Work>(cbSuccess, cbFailure, std::move(pathBuffer), pathString);
 }
 
 void hx::asys::filesystem::Directory_obj::setLinkOwner(Context ctx, String path, int user, int group, Dynamic cbSuccess, Dynamic cbFailure)
@@ -713,7 +713,7 @@ void hx::asys::filesystem::Directory_obj::setLinkOwner(Context ctx, String path,
     auto pathBuffer = std::make_unique<hx::strbuf>();
     auto pathString = path.utf8_str(pathBuffer.get());
 
-    libuvCtx->ctx->enqueue(std::move(std::make_unique<SetLinkOwnerWork>(cbSuccess, cbFailure, std::move(pathBuffer), pathString, user, group)));
+    libuvCtx->ctx->emplace<SetLinkOwnerWork>(cbSuccess, cbFailure, std::move(pathBuffer), pathString, user, group);
 }
 
 void hx::asys::filesystem::Directory_obj::link(Context ctx, String target, String path, int type, Dynamic cbSuccess, Dynamic cbFailure)
@@ -771,7 +771,7 @@ void hx::asys::filesystem::Directory_obj::link(Context ctx, String target, Strin
     auto targetString = path.utf8_str(targetBuffer.get());
     auto pathString   = path.utf8_str(pathBuffer.get());
 
-    libuvCtx->ctx->enqueue(std::move(std::make_unique<LinkWork>(cbSuccess, cbFailure, std::move(targetBuffer), std::move(pathBuffer), targetString, pathString, type)));
+    libuvCtx->ctx->emplace<LinkWork>(cbSuccess, cbFailure, std::move(targetBuffer), std::move(pathBuffer), targetString, pathString, type);
 }
 
 void hx::asys::filesystem::Directory_obj::linkInfo(Context ctx, String path, Dynamic cbSuccess, Dynamic cbFailure)
@@ -849,7 +849,7 @@ void hx::asys::filesystem::Directory_obj::linkInfo(Context ctx, String path, Dyn
     auto pathBuffer = std::make_unique<hx::strbuf>();
     auto pathString = path.utf8_str(pathBuffer.get());
 
-    libuvCtx->ctx->enqueue(std::move(std::make_unique<LinkInfoWork>(cbSuccess, cbFailure, std::move(pathBuffer), pathString)));
+    libuvCtx->ctx->emplace<LinkInfoWork>(cbSuccess, cbFailure, std::move(pathBuffer), pathString);
 }
 
 void hx::asys::filesystem::Directory_obj::readLink(Context ctx, String path, Dynamic cbSuccess, Dynamic cbFailure)
@@ -897,7 +897,7 @@ void hx::asys::filesystem::Directory_obj::readLink(Context ctx, String path, Dyn
     auto pathBuffer = std::make_unique<hx::strbuf>();
     auto pathString = path.utf8_str(pathBuffer.get());
 
-    libuvCtx->ctx->enqueue(std::move(std::make_unique<ReadLinkWork>(cbSuccess, cbFailure, std::move(pathBuffer), pathString)));
+    libuvCtx->ctx->emplace<ReadLinkWork>(cbSuccess, cbFailure, std::move(pathBuffer), pathString);
 }
 
 void hx::asys::filesystem::Directory_obj::copyFile(Context ctx, String source, String destination, bool overwrite, Dynamic cbSuccess, Dynamic cbFailure)
@@ -951,7 +951,7 @@ void hx::asys::filesystem::Directory_obj::copyFile(Context ctx, String source, S
     auto srcPathString = source.utf8_str(srcPathBuffer.get());
     auto dstPathString = destination.utf8_str(dstPathBuffer.get());
 
-    libuvCtx->ctx->enqueue(std::move(std::make_unique<CopyFileWork>(cbSuccess, cbFailure, std::move(srcPathBuffer), std::move(dstPathBuffer), srcPathString, dstPathString)));
+    libuvCtx->ctx->emplace<CopyFileWork>(cbSuccess, cbFailure, std::move(srcPathBuffer), std::move(dstPathBuffer), srcPathString, dstPathString);
 }
 
 void hx::asys::filesystem::Directory_obj::realPath(Context ctx, String path, Dynamic cbSuccess, Dynamic cbFailure)
@@ -997,5 +997,5 @@ void hx::asys::filesystem::Directory_obj::realPath(Context ctx, String path, Dyn
     auto pathBuffer = std::make_unique<hx::strbuf>();
     auto pathString = path.utf8_str(pathBuffer.get());
 
-    libuvCtx->ctx->enqueue(std::move(std::make_unique<RealPathWork>(cbSuccess, cbFailure, std::move(pathBuffer), pathString)));
+    libuvCtx->ctx->emplace<RealPathWork>(cbSuccess, cbFailure, std::move(pathBuffer), pathString);
 }

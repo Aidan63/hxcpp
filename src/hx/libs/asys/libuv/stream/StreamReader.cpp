@@ -104,5 +104,5 @@ void hx::asys::libuv::stream::StreamReader_obj::read(Array<uint8_t> output, int 
 
     auto libuv = static_cast<hx::asys::libuv::LibuvAsysContext_obj::Ctx*>(ctx.stream->loop->data);
 
-    libuv->enqueue(std::make_unique<ReadWork>(cbSuccess, cbFailure, ctx, output, offset, length));
+    libuv->emplace<ReadWork>(cbSuccess, cbFailure, ctx, output, offset, length);
 }

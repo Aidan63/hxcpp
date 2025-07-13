@@ -74,7 +74,7 @@ void hx::asys::libuv::stream::StreamWriter_obj::write(Array<uint8_t> data, int o
 {
 	auto ctx = static_cast<LibuvAsysContext_obj::Ctx*>(stream->loop->data);
 
-	ctx->enqueue(std::make_unique<WriteWork>(cbSuccess, cbFailure, stream, data->Pin(), data->GetBase() + offset, length));
+	ctx->emplace<WriteWork>(cbSuccess, cbFailure, stream, data->Pin(), data->GetBase() + offset, length);
 }
 
 void hx::asys::libuv::stream::StreamWriter_obj::flush(Dynamic cbSuccess, Dynamic cbFailure)

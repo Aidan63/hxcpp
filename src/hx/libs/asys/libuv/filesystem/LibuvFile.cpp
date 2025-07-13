@@ -147,9 +147,8 @@ void hx::asys::filesystem::File_obj::open(Context ctx, String path, int flags, D
     };
 
     auto libuvCtx = hx::asys::libuv::context(ctx);
-    auto request  = std::make_unique<FileOpenWork>(cbSuccess, cbFailure, path, openFlag(flags), openMode(flags));
 
-    libuvCtx->ctx->enqueue(std::move(request));
+    libuvCtx->ctx->emplace<FileOpenWork>(cbSuccess, cbFailure, path, openFlag(flags), openMode(flags));
 }
 
 void hx::asys::filesystem::File_obj::temp(Context ctx, Dynamic cbSuccess, Dynamic cbFailure)
@@ -199,7 +198,7 @@ void hx::asys::filesystem::File_obj::temp(Context ctx, Dynamic cbSuccess, Dynami
     auto path     = std::filesystem::path(buffer.data()) / std::filesystem::path("XXXXXX");
     auto libuvCtx = hx::asys::libuv::context(ctx);
 
-    libuvCtx->ctx->enqueue(std::move(std::make_unique<TempWork>(cbSuccess, cbFailure, path)));
+    libuvCtx->ctx->emplace<TempWork>(cbSuccess, cbFailure, path);
 }
 
 void hx::asys::filesystem::File_obj::info(Context ctx, String path, Dynamic cbSuccess, Dynamic cbFailure)
@@ -245,7 +244,7 @@ void hx::asys::filesystem::File_obj::info(Context ctx, String path, Dynamic cbSu
     auto pathBuffer = std::make_unique<hx::strbuf>();
     auto pathString = path.utf8_str(pathBuffer.get());
 
-    libuvCtx->ctx->enqueue(std::move(std::make_unique<InfoWork>(cbSuccess, cbFailure, std::move(pathBuffer), pathString)));
+    libuvCtx->ctx->emplace<InfoWork>(cbSuccess, cbFailure, std::move(pathBuffer), pathString);
 }
 
 hx::asys::libuv::filesystem::LibuvFile_obj::LibuvFile_obj(uv_loop_t* _loop, uv_file _file, const String _path)
@@ -308,7 +307,7 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::write(::cpp::Int64 pos, Array<u
 
     auto ctx = static_cast<LibuvAsysContext_obj::Ctx*>(loop->data);
 
-    ctx->enqueue(std::move(std::make_unique<WriteWork>(cbSuccess, cbFailure, data->Pin(), file, pos, offset, length)));
+    ctx->emplace<WriteWork>(cbSuccess, cbFailure, data->Pin(), file, pos, offset, length);
 }
 
 void hx::asys::libuv::filesystem::LibuvFile_obj::read(::cpp::Int64 pos, Array<uint8_t> output, int offset, int length, Dynamic cbSuccess, Dynamic cbFailure)
@@ -365,7 +364,7 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::read(::cpp::Int64 pos, Array<ui
 
     auto ctx = static_cast<LibuvAsysContext_obj::Ctx*>(loop->data);
 
-    ctx->enqueue(std::move(std::make_unique<ReadWork>(cbSuccess, cbFailure, output->Pin(), file, pos, offset, length)));
+    ctx->emplace<ReadWork>(cbSuccess, cbFailure, output->Pin(), file, pos, offset, length);
 }
 
 void hx::asys::libuv::filesystem::LibuvFile_obj::info(Dynamic cbSuccess, Dynamic cbFailure)
@@ -400,7 +399,7 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::info(Dynamic cbSuccess, Dynamic
 
     auto ctx = static_cast<LibuvAsysContext_obj::Ctx*>(loop->data);
 
-    ctx->enqueue(std::move(std::make_unique<StatWork>(cbSuccess, cbFailure, file)));
+    ctx->emplace<StatWork>(cbSuccess, cbFailure, file);
 }
 
 void hx::asys::libuv::filesystem::LibuvFile_obj::resize(int size, Dynamic cbSuccess, Dynamic cbFailure)
@@ -434,7 +433,7 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::resize(int size, Dynamic cbSucc
 
     auto ctx = static_cast<LibuvAsysContext_obj::Ctx*>(loop->data);
 
-    ctx->enqueue(std::move(std::make_unique<ResizeWork>(file, size, cbSuccess.mPtr, cbFailure.mPtr)));
+    ctx->emplace<ResizeWork>(file, size, cbSuccess.mPtr, cbFailure.mPtr);
 }
 
 void hx::asys::libuv::filesystem::LibuvFile_obj::setPermissions(int permissions, Dynamic cbSuccess, Dynamic cbFailure)
@@ -468,7 +467,7 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::setPermissions(int permissions,
 
     auto ctx = static_cast<LibuvAsysContext_obj::Ctx*>(loop->data);
 
-    ctx->enqueue(std::move(std::make_unique<SetPermissionsWork>(file, permissions, cbSuccess.mPtr, cbFailure.mPtr)));
+    ctx->emplace<SetPermissionsWork>(file, permissions, cbSuccess.mPtr, cbFailure.mPtr);
 }
 
 void hx::asys::libuv::filesystem::LibuvFile_obj::setOwner(int user, int group, Dynamic cbSuccess, Dynamic cbFailure)
@@ -504,7 +503,7 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::setOwner(int user, int group, D
 
     auto ctx = static_cast<LibuvAsysContext_obj::Ctx*>(loop->data);
 
-    ctx->enqueue(std::move(std::make_unique<SetOwnerWork>(file, user, group, cbSuccess.mPtr, cbFailure.mPtr)));
+    ctx->emplace<SetOwnerWork>(file, user, group, cbSuccess.mPtr, cbFailure.mPtr);
 }
 
 void hx::asys::libuv::filesystem::LibuvFile_obj::setTimes(int accessTime, int modificationTime, Dynamic cbSuccess, Dynamic cbFailure)
@@ -540,7 +539,7 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::setTimes(int accessTime, int mo
 
     auto ctx = static_cast<LibuvAsysContext_obj::Ctx*>(loop->data);
 
-    ctx->enqueue(std::move(std::make_unique<SetTimesWork>(file, accessTime, modificationTime, cbSuccess.mPtr, cbFailure.mPtr)));
+    ctx->emplace<SetTimesWork>(file, accessTime, modificationTime, cbSuccess.mPtr, cbFailure.mPtr);
 }
 
 void hx::asys::libuv::filesystem::LibuvFile_obj::flush(Dynamic cbSuccess, Dynamic cbFailure)
@@ -570,7 +569,7 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::flush(Dynamic cbSuccess, Dynami
 
     auto ctx = static_cast<LibuvAsysContext_obj::Ctx*>(loop->data);
 
-    ctx->enqueue(std::move(std::make_unique<FlushWork>(file, cbSuccess.mPtr, cbFailure.mPtr)));
+    ctx->emplace<FlushWork>(file, cbSuccess.mPtr, cbFailure.mPtr);
 }
 
 void hx::asys::libuv::filesystem::LibuvFile_obj::close(Dynamic cbSuccess, Dynamic cbFailure)
@@ -608,7 +607,7 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::close(Dynamic cbSuccess, Dynami
 
     auto ctx = static_cast<LibuvAsysContext_obj::Ctx*>(loop->data);
 
-    ctx->enqueue(std::move(std::make_unique<CloseWork>(file, cbSuccess.mPtr, cbFailure.mPtr)));
+    ctx->emplace<CloseWork>(file, cbSuccess.mPtr, cbFailure.mPtr);
 }
 
 void hx::asys::libuv::filesystem::LibuvFile_obj::__Mark(hx::MarkContext* __inCtx)

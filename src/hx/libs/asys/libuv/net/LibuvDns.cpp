@@ -136,7 +136,7 @@ void hx::asys::net::dns::resolve(Context ctx, String host, Dynamic cbSuccess, Dy
     auto hostBuffer = std::make_unique<hx::strbuf>();
     auto hostString = host.utf8_str(hostBuffer.get());
 
-    libuvCtx->ctx->enqueue(std::move(std::make_unique<ResolveWork>(cbSuccess, cbFailure, std::move(hostBuffer), hostString)));
+    libuvCtx->ctx->emplace<ResolveWork>(cbSuccess, cbFailure, std::move(hostBuffer), hostString);
 }
 
 void hx::asys::net::dns::reverse(Context ctx, const Ipv4Address ip, Dynamic cbSuccess, Dynamic cbFailure)
@@ -169,7 +169,7 @@ void hx::asys::net::dns::reverse(Context ctx, const Ipv4Address ip, Dynamic cbSu
     auto libuvCtx = hx::asys::libuv::context(ctx);
     auto addr     = hx::asys::libuv::net::sockaddr_from_int(ip);
 
-    libuvCtx->ctx->enqueue(std::move(std::make_unique<ReverseWork>(cbSuccess, cbFailure, addr)));
+    libuvCtx->ctx->emplace<ReverseWork>(cbSuccess, cbFailure, addr);
 }
 
 void hx::asys::net::dns::reverse(Context ctx, const Ipv6Address ip, Dynamic cbSuccess, Dynamic cbFailure)
@@ -202,5 +202,5 @@ void hx::asys::net::dns::reverse(Context ctx, const Ipv6Address ip, Dynamic cbSu
     auto libuvCtx = hx::asys::libuv::context(ctx);
     auto addr     = hx::asys::libuv::net::sockaddr_from_data(ip);
 
-    libuvCtx->ctx->enqueue(std::move(std::make_unique<ReverseWork>(cbSuccess, cbFailure, addr)));
+    libuvCtx->ctx->emplace<ReverseWork>(cbSuccess, cbFailure, addr);
 }
