@@ -4,7 +4,7 @@
 
 namespace
 {
-	class WriteRequest final : hx::asys::libuv::BaseRequest
+	class WriteRequest final : public hx::asys::libuv::BaseRequest
 	{
 		std::unique_ptr<hx::ArrayPin> pin;
 
@@ -12,8 +12,8 @@ namespace
 		uv_write_t request;
 		uv_buf_t buffer;
 
-		WriteRequest(Dynamic _cbSuccess, Dynamic _cbFailure, std::unique_ptr<hx::ArrayPin> _pin, uv_buf_t _buffer)
-			: BaseRequest(_cbSuccess, _cbFailure)
+		WriteRequest(std::unique_ptr<hx::asys::libuv::RootedCallbacks> _callbacks, std::unique_ptr<hx::ArrayPin> _pin, uv_buf_t _buffer)
+			: BaseRequest(std::move(_callbacks))
 			, pin(std::move(_pin))
 			, buffer(_buffer)
 		{
@@ -22,16 +22,16 @@ namespace
 
 		static void callback(uv_write_t* request, int status)
 		{
-			auto gcZone = hx::AutoGCZone();
-			auto spData = std::unique_ptr<WriteRequest>(static_cast<WriteRequest*>(request->data));
+			auto gcZone    = hx::AutoGCZone();
+			auto sprequest = std::unique_ptr<WriteRequest>(static_cast<WriteRequest*>(request->data));
 
 			if (status < 0)
 			{
-				Dynamic(spData->cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(status));
+				sprequest->callbacks->fail(hx::asys::libuv::uv_err_to_enum(status));
 			}
 			else
 			{
-				Dynamic(spData->cbSuccess.rooted)(spData->buffer.len);
+				sprequest->callbacks->succeed(sprequest->buffer.len);
 			}
 		}
 	};
@@ -53,12 +53,12 @@ namespace
 
 		void run(uv_loop_t* loop) override
 		{
-			auto request = std::make_unique<WriteRequest>(callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted, std::move(pin), uv_buf_init(base, length));
+			auto request = std::make_unique<WriteRequest>(std::move(callbacks), std::move(pin), uv_buf_init(base, length));
 			auto result  = uv_write(&request->request, stream, &request->buffer, 1, WriteRequest::callback);
 
 			if (result < 0)
 			{
-				callbacks->fail(hx::asys::libuv::uv_err_to_enum(result));
+				request->callbacks->fail(hx::asys::libuv::uv_err_to_enum(result));
 			}
 			else
 			{

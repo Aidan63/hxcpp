@@ -55,7 +55,7 @@ namespace
 					return;
 				}*/
 
-				Dynamic(request->cbSuccess.rooted)(hx::asys::net::TcpSocket(new hx::asys::libuv::net::LibuvTcpSocket(std::move(tcp), local, remote)));
+				request->succeed(hx::asys::net::TcpSocket(new hx::asys::libuv::net::LibuvTcpSocket(std::move(tcp), local, remote)));
 			}
 		}
 	}
@@ -173,19 +173,19 @@ void hx::asys::libuv::net::LibuvTcpServer::ConnectionQueue::clear()
 	queue.clear();
 }
 
-void hx::asys::libuv::net::LibuvTcpServer::ConnectionQueue::enqueue(Dynamic cbSuccess, Dynamic cbFailure)
+void hx::asys::libuv::net::LibuvTcpServer::ConnectionQueue::enqueue(std::unique_ptr<hx::asys::libuv::RootedCallbacks> _callbacks)
 {
-	queue.push_back(std::make_unique<hx::asys::libuv::BaseRequest>(cbSuccess, cbFailure));
+	queue.push_back(std::move(_callbacks));
 }
 
-std::unique_ptr<hx::asys::libuv::BaseRequest> hx::asys::libuv::net::LibuvTcpServer::ConnectionQueue::tryDequeue()
+std::unique_ptr<hx::asys::libuv::RootedCallbacks> hx::asys::libuv::net::LibuvTcpServer::ConnectionQueue::tryDequeue()
 {
 	if (queue.empty())
 	{
 		return nullptr;
 	}
 
-	auto root = std::unique_ptr<hx::asys::libuv::BaseRequest>{ std::move(queue.front()) };
+	auto root = std::unique_ptr<hx::asys::libuv::RootedCallbacks> { std::move(queue.front()) };
 
 	queue.pop_front();
 
@@ -217,7 +217,7 @@ void hx::asys::libuv::net::LibuvTcpServer::accept(Dynamic cbSuccess, Dynamic cbF
 
 		void run(uv_loop_t* loop) override
 		{
-			ctx->connections.enqueue(callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted);
+			ctx->connections.enqueue(std::move(callbacks));
 		}
 	};
 

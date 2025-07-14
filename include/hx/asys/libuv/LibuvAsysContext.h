@@ -15,20 +15,48 @@ HX_DECLARE_CLASS3(hx, asys, libuv, LibuvAsysContext)
 
 namespace hx::asys::libuv
 {
-    struct BaseRequest
+    struct RootedCallbacks final
     {
         hx::RootedObject<hx::Object> cbSuccess;
         hx::RootedObject<hx::Object> cbFailure;
 
-        BaseRequest(Dynamic _cbSuccess, Dynamic _cbFailure);
+        RootedCallbacks(Dynamic _cbSuccess, Dynamic _cbFailure);
+
+        template <class... TArgs>
+        void succeed(TArgs... args)
+        {
+            Dynamic(cbSuccess.rooted)(args...);
+        }
+
+        template <class... TArgs>
+        void fail(TArgs... args)
+        {
+            Dynamic(cbFailure.rooted)(args...);
+        }
+    };
+
+    struct BaseRequest
+    {
+        std::unique_ptr<RootedCallbacks> callbacks;
+
+        BaseRequest(std::unique_ptr<RootedCallbacks> _callbacks);
         virtual ~BaseRequest() = default;
     };
 
-    struct WorkRequest : public BaseRequest
+    struct WorkRequest
     {
-        WorkRequest(Dynamic _cbSuccess, Dynamic _cbFailure) : BaseRequest(_cbSuccess.mPtr, _cbFailure.mPtr) {}
-
         virtual void run(uv_loop_t* loop) = 0;
+    };
+
+    class CallbackWorkRequest : public WorkRequest
+    {
+    protected:
+        std::unique_ptr<RootedCallbacks> callbacks;
+
+    public:
+        CallbackWorkRequest(Dynamic _cbSuccess, Dynamic _cbFailure) : callbacks(std::make_unique<RootedCallbacks>(_cbSuccess, _cbFailure)) {}
+
+        virtual ~CallbackWorkRequest() = default;
     };
 
     class LibuvAsysContext_obj final : public Context_obj

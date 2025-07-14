@@ -12,7 +12,7 @@ namespace hx::asys::libuv::net
 	public:
 		class ConnectionQueue
 		{
-			std::deque<std::unique_ptr<hx::asys::libuv::BaseRequest>> queue;
+			std::deque<std::unique_ptr<hx::asys::libuv::RootedCallbacks>> queue;
 
 		public:
 			int existing;
@@ -20,8 +20,8 @@ namespace hx::asys::libuv::net
 			ConnectionQueue();
 
 			void clear();
-			void enqueue(Dynamic cbSuccess, Dynamic cbFailure);
-			std::unique_ptr<hx::asys::libuv::BaseRequest> tryDequeue();
+			void enqueue(std::unique_ptr<hx::asys::libuv::RootedCallbacks> _callbacks);
+			std::unique_ptr<hx::asys::libuv::RootedCallbacks> tryDequeue();
 		};
 
 		struct Ctx

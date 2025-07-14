@@ -74,8 +74,8 @@ hx::EnumBase hx::asys::libuv::uv_err_to_enum(const int code)
     }
 }
 
-hx::asys::libuv::BaseRequest::BaseRequest(Dynamic _cbSuccess, Dynamic _cbFailure)
-    : cbSuccess(_cbSuccess.mPtr), cbFailure(_cbFailure.mPtr) {}
+hx::asys::libuv::BaseRequest::BaseRequest(std::unique_ptr<hx::asys::libuv::RootedCallbacks> _callbacks)
+    : callbacks(std::move(_callbacks)) {}
 
 void hx::asys::libuv::basic_callback(uv_fs_t* request)
 {
@@ -85,11 +85,11 @@ void hx::asys::libuv::basic_callback(uv_fs_t* request)
 
     if (spRequest->result < 0)
     {
-        Dynamic(spData->cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(spRequest->result));
+        spData->callbacks->fail(hx::asys::libuv::uv_err_to_enum(spRequest->result));
     }
     else
     {
-        Dynamic(spData->cbSuccess.rooted)();
+        spData->callbacks->succeed();
     }
 }
 

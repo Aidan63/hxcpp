@@ -24,7 +24,7 @@ void hx::asys::libuv::stream::StreamReader_obj::Ctx::consume()
 
         queue.pop_front();
 
-        Dynamic(request.cbSuccess.rooted)(size);
+        request.callbacks->succeed(size);
     }
 
     if (queue.empty())
@@ -41,14 +41,14 @@ void hx::asys::libuv::stream::StreamReader_obj::Ctx::reject(int code)
     {
         auto& request = queue.front();
 
-        Dynamic(request.cbFailure.rooted)(asys::libuv::uv_err_to_enum(code));
+        request.callbacks->fail(asys::libuv::uv_err_to_enum(code));
 
         queue.pop_front();
     }
 }
 
-hx::asys::libuv::stream::StreamReader_obj::QueuedRead::QueuedRead(const Array<uint8_t> _array, const int _offset, const int _length, const Dynamic _cbSuccess, const Dynamic _cbFailure)
-    : BaseRequest(_cbSuccess, _cbFailure)
+hx::asys::libuv::stream::StreamReader_obj::QueuedRead::QueuedRead(std::unique_ptr<hx::asys::libuv::RootedCallbacks> _callbacks, const Array<uint8_t> _array, const int _offset, const int _length)
+    : BaseRequest(std::move(_callbacks))
     , array(_array.mPtr)
     , offset(_offset)
     , length(_length)
@@ -83,7 +83,7 @@ void hx::asys::libuv::stream::StreamReader_obj::read(Array<uint8_t> output, int 
             {
                 if (!ctx.buffer.empty())
                 {
-                    ctx.queue.emplace_back(array.rooted, offset, length, callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted);
+                    ctx.queue.emplace_back(std::move(callbacks), array.rooted, offset, length);
                     ctx.consume();
 
                     return;
@@ -98,7 +98,7 @@ void hx::asys::libuv::stream::StreamReader_obj::read(Array<uint8_t> output, int 
                 }
             }
 
-            ctx.queue.emplace_back(array.rooted, offset, length, callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted);
+            ctx.queue.emplace_back(std::move(callbacks), array.rooted, offset, length);
         }
     };
 

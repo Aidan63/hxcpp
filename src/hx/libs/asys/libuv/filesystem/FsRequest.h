@@ -12,7 +12,7 @@ namespace hx::asys::libuv::filesystem
     public:
         uv_fs_t uv;
 
-        FsRequest(Dynamic _cbSuccess, Dynamic _cbFailure) : BaseRequest(_cbSuccess, _cbFailure)
+        FsRequest(std::unique_ptr<RootedCallbacks> _callbacks) : BaseRequest(std::move(_callbacks))
         {
             uv.data = this;
         }
@@ -29,11 +29,11 @@ namespace hx::asys::libuv::filesystem
 
             if (spRequest->uv.result < 0)
             {
-                Dynamic(spRequest->cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(spRequest->uv.result));
+                spRequest->callbacks->fail(hx::asys::libuv::uv_err_to_enum(spRequest->uv.result));
             }
             else
             {
-                Dynamic(spRequest->cbSuccess.rooted)(spRequest->uv.result);
+                spRequest->callbacks->succeed(spRequest->uv.result);
             }
         }
     };

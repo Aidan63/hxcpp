@@ -12,13 +12,13 @@ namespace hx::asys::libuv::stream
     class StreamReader_obj : public hx::asys::Readable_obj
     {
     public:
-        struct QueuedRead final : BaseRequest
+        struct QueuedRead final : public BaseRequest
         {
             hx::RootedObject<Array_obj<uint8_t>> array;
             int offset;
             int length;
 
-            QueuedRead(const Array<uint8_t> _array, const int _offset, const int _length, const Dynamic _cbSuccess, const Dynamic _cbFailure);
+            QueuedRead(std::unique_ptr<hx::asys::libuv::RootedCallbacks> _callbacks, const Array<uint8_t> _array, const int _offset, const int _length);
         };
 
         struct Ctx
