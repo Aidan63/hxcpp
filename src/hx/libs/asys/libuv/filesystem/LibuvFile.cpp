@@ -98,6 +98,21 @@ namespace
             Dynamic(spRequest->cbSuccess.rooted)(statBuf);
         }
     }
+
+    void onFinalise(Dynamic obj)
+    {
+        //class FinaliseWork : public hx::asys::libuv::WorkRequest
+        //{
+        //public:
+        //    void run(uv_loop_t* loop) override
+        //    {
+        //        //
+        //    }
+        //};
+
+        //auto file = reinterpret_cast<hx::asys::libuv::filesystem::LibuvFile_obj*>(obj.mPtr);
+        //auto ctx  = static_cast<hx::asys::libuv::LibuvAsysContext_obj::Ctx*>();
+    }
 }
 
 void hx::asys::filesystem::File_obj::open(Context ctx, String path, int flags, Dynamic cbSuccess, Dynamic cbFailure)
@@ -112,7 +127,7 @@ void hx::asys::filesystem::File_obj::open(Context ctx, String path, int flags, D
             , pathBuffer(std::move(_pathBuffer)) {}
     };
 
-    class FileOpenWork : public hx::asys::libuv::WorkRequest
+    class FileOpenWork : public hx::asys::libuv::CallbackWorkRequest
     {
         const int flags;
         const int mode;
@@ -121,7 +136,7 @@ void hx::asys::filesystem::File_obj::open(Context ctx, String path, int flags, D
 
     public:
         FileOpenWork(Dynamic _cbSuccess, Dynamic _cbFailure, String _path, int _flags, int _mode)
-            : WorkRequest(_cbSuccess, _cbFailure)
+            : CallbackWorkRequest(_cbSuccess, _cbFailure)
             , pathBuffer(new hx::strbuf())
             , flags(_flags)
             , mode(_mode)
@@ -133,11 +148,11 @@ void hx::asys::filesystem::File_obj::open(Context ctx, String path, int flags, D
         void run(uv_loop_t* loop) override
         {
             auto gcZone  = hx::AutoGCZone();
-            auto request = std::make_unique<FileOpenRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(pathBuffer));
+            auto request = std::make_unique<FileOpenRequest>(callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted, std::move(pathBuffer));
             auto result  = uv_fs_open(loop, &request->uv, path, flags, mode, onOpenCallback);
             if (result < 0)
             {
-                Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+                callbacks->fail(hx::asys::libuv::uv_err_to_enum(result));
             }
             else
             {
@@ -153,21 +168,23 @@ void hx::asys::filesystem::File_obj::open(Context ctx, String path, int flags, D
 
 void hx::asys::filesystem::File_obj::temp(Context ctx, Dynamic cbSuccess, Dynamic cbFailure)
 {
-    class TempWork : public hx::asys::libuv::WorkRequest
+    class TempWork : public hx::asys::libuv::CallbackWorkRequest
     {
         std::filesystem::path path;
 
     public:
-        TempWork(Dynamic _cbSuccess, Dynamic _cbFailure, std::filesystem::path _path) : WorkRequest(_cbSuccess, _cbFailure), path(_path) {}
+        TempWork(Dynamic _cbSuccess, Dynamic _cbFailure, std::filesystem::path _path)
+            : CallbackWorkRequest(_cbSuccess, _cbFailure)
+            , path(_path) {}
 
         void run(uv_loop_t* loop) override
         {
             auto gcZone  = hx::AutoGCZone();
-            auto request = std::make_unique<hx::asys::libuv::filesystem::FsRequest>(cbSuccess.rooted, cbFailure.rooted);
+            auto request = std::make_unique<hx::asys::libuv::filesystem::FsRequest>(callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted);
             auto result  = uv_fs_mkstemp(loop, &request->uv, path.string().c_str(), onOpenCallback);
             if (result < 0)
             {
-                Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+                callbacks->fail(hx::asys::libuv::uv_err_to_enum(result));
             }
             else
             {
@@ -213,25 +230,25 @@ void hx::asys::filesystem::File_obj::info(Context ctx, String path, Dynamic cbSu
             , buffer(std::move(_buffer)) {}
     };
 
-    class InfoWork final : public hx::asys::libuv::WorkRequest
+    class InfoWork final : public hx::asys::libuv::CallbackWorkRequest
     {
         std::unique_ptr<hx::strbuf> buffer;
         const char* path;
 
     public:
         InfoWork(Dynamic _cbSuccess, Dynamic _cbFailure, std::unique_ptr<hx::strbuf> _buffer, const char* _path)
-            : WorkRequest(_cbSuccess, _cbFailure)
+            : CallbackWorkRequest(_cbSuccess, _cbFailure)
             , buffer(std::move(_buffer))
             , path(_path) {}
 
         void run(uv_loop_t* loop) override
         {
             auto gcZone  = hx::AutoGCZone();
-            auto request = std::make_unique<InfoRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(buffer));
+            auto request = std::make_unique<InfoRequest>(callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted, std::move(buffer));
             auto result  = uv_fs_stat(loop, &request->uv, path, onStatCallback);
             if (result < 0)
             {
-                Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+                callbacks->fail(hx::asys::libuv::uv_err_to_enum(result));
             }
             else
             {
@@ -251,7 +268,10 @@ hx::asys::libuv::filesystem::LibuvFile_obj::LibuvFile_obj(uv_loop_t* _loop, uv_f
     : File_obj(_path)
     , loop(_loop)
     , closed(false)
-    , file(_file) {}
+    , file(_file)
+{
+    _hx_set_finalizer(this, onFinalise);
+}
 
 void hx::asys::libuv::filesystem::LibuvFile_obj::write(::cpp::Int64 pos, Array<uint8_t> data, int offset, int length, Dynamic cbSuccess, Dynamic cbFailure)
 {
@@ -272,7 +292,7 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::write(::cpp::Int64 pos, Array<u
         }
     };
 
-    class WriteWork final : public hx::asys::libuv::WorkRequest
+    class WriteWork final : public hx::asys::libuv::CallbackWorkRequest
     {
         std::unique_ptr<hx::ArrayPin> pin;
         const uv_file file;
@@ -282,7 +302,7 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::write(::cpp::Int64 pos, Array<u
 
     public:
         WriteWork(Dynamic _cbSuccess, Dynamic _cbFailure, hx::ArrayPin* _pin, uv_file _file, int64_t _pos, int _offset, int _length)
-            : WorkRequest(_cbSuccess, _cbFailure)
+            : CallbackWorkRequest(_cbSuccess, _cbFailure)
             , pin(_pin)
             , file(_file)
             , pos(_pos)
@@ -292,11 +312,11 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::write(::cpp::Int64 pos, Array<u
         void run(uv_loop_t* loop) override
         {
             auto gcZone  = hx::AutoGCZone();
-            auto request = std::make_unique<WriteRequest>(std::move(pin), offset, length, cbSuccess.rooted, cbFailure.rooted);
+            auto request = std::make_unique<WriteRequest>(std::move(pin), offset, length, callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted);
             auto result  = uv_fs_write(loop, &request->uv, file, &request->buffer, 1, pos, FsRequest::callback);
             if (result < 0)
             {
-                Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+                callbacks->fail(hx::asys::libuv::uv_err_to_enum(result));
             }
             else
             {
@@ -329,7 +349,7 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::read(::cpp::Int64 pos, Array<ui
         }
     };
 
-    class ReadWork final : public hx::asys::libuv::WorkRequest
+    class ReadWork final : public hx::asys::libuv::CallbackWorkRequest
     {
         std::unique_ptr<hx::ArrayPin> pin;
         const uv_file file;
@@ -339,7 +359,7 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::read(::cpp::Int64 pos, Array<ui
 
     public:
         ReadWork(Dynamic _cbSuccess, Dynamic _cbFailure, hx::ArrayPin* _pin, uv_file _file, int64_t _pos, int _offset, int _length)
-            : WorkRequest(_cbSuccess, _cbFailure)
+            : CallbackWorkRequest(_cbSuccess, _cbFailure)
             , pin(_pin)
             , file(_file)
             , pos(_pos)
@@ -349,11 +369,11 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::read(::cpp::Int64 pos, Array<ui
         void run(uv_loop_t* loop) override
         {
             auto gcZone  = hx::AutoGCZone();
-            auto request = std::make_unique<ReadRequest>(std::move(pin), offset, length, cbSuccess.rooted, cbFailure.rooted);
+            auto request = std::make_unique<ReadRequest>(std::move(pin), offset, length, callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted);
             auto result  = uv_fs_read(loop, &request->uv, file, &request->buffer, 1, pos, FsRequest::callback);
             if (result < 0)
             {
-                Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+                callbacks->fail(hx::asys::libuv::uv_err_to_enum(result));
             }
             else
             {
@@ -369,13 +389,13 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::read(::cpp::Int64 pos, Array<ui
 
 void hx::asys::libuv::filesystem::LibuvFile_obj::info(Dynamic cbSuccess, Dynamic cbFailure)
 {
-    class StatWork final : public hx::asys::libuv::WorkRequest
+    class StatWork final : public hx::asys::libuv::CallbackWorkRequest
     {
         const uv_file file;
 
     public:
         StatWork(Dynamic _cbSuccess, Dynamic _cbFailure, uv_file _file)
-            : WorkRequest(_cbSuccess, _cbFailure)
+            : CallbackWorkRequest(_cbSuccess, _cbFailure)
             , file(_file)
         {
             //
@@ -384,11 +404,11 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::info(Dynamic cbSuccess, Dynamic
         void run(uv_loop_t* loop) override
         {
             auto gcZone  = hx::AutoGCZone();
-            auto request = std::make_unique<hx::asys::libuv::filesystem::FsRequest>(cbSuccess.rooted, cbFailure.rooted);
+            auto request = std::make_unique<hx::asys::libuv::filesystem::FsRequest>(callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted);
             auto result  = uv_fs_fstat(loop, &request->uv, file, onStatCallback);
             if (result < 0)
             {
-                Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+                callbacks->fail(hx::asys::libuv::uv_err_to_enum(result));
             }
             else
             {
@@ -404,25 +424,25 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::info(Dynamic cbSuccess, Dynamic
 
 void hx::asys::libuv::filesystem::LibuvFile_obj::resize(int size, Dynamic cbSuccess, Dynamic cbFailure)
 {
-    class ResizeWork final : public hx::asys::libuv::WorkRequest
+    class ResizeWork final : public hx::asys::libuv::CallbackWorkRequest
     {
         const uv_file file;
         const int size;
 
     public:
         ResizeWork(const uv_file _file, const int _size, Dynamic _cbSuccess, Dynamic _cbFailure)
-            : WorkRequest(_cbSuccess, _cbFailure)
+            : CallbackWorkRequest(_cbSuccess, _cbFailure)
             , file(_file)
             , size(_size) {}
 
         void run(uv_loop_t* loop) override
         {
             auto gcZone  = hx::AutoGCZone();
-            auto request = std::make_unique<FsRequest>(cbSuccess.rooted, cbFailure.rooted);
+            auto request = std::make_unique<FsRequest>(callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted);
             auto result  = uv_fs_ftruncate(loop, &request->uv, file, size, FsRequest::callback);
             if (result < 0)
             {
-                Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+                callbacks->fail(hx::asys::libuv::uv_err_to_enum(result));
             }
             else
             {
@@ -438,25 +458,25 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::resize(int size, Dynamic cbSucc
 
 void hx::asys::libuv::filesystem::LibuvFile_obj::setPermissions(int permissions, Dynamic cbSuccess, Dynamic cbFailure)
 {
-    class SetPermissionsWork final : public hx::asys::libuv::WorkRequest
+    class SetPermissionsWork final : public hx::asys::libuv::CallbackWorkRequest
     {
         const uv_file file;
         const int permissions;
 
     public:
         SetPermissionsWork(const uv_file _file, const int _permissions, Dynamic _cbSuccess, Dynamic _cbFailure)
-            : WorkRequest(_cbSuccess, _cbFailure)
+            : CallbackWorkRequest(_cbSuccess, _cbFailure)
             , file(_file)
             , permissions(_permissions) {}
 
         void run(uv_loop_t* loop) override
         {
             auto gcZone  = hx::AutoGCZone();
-            auto request = std::make_unique<FsRequest>(cbSuccess.rooted, cbFailure.rooted);
+            auto request = std::make_unique<FsRequest>(callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted);
             auto result  = uv_fs_fchmod(loop, &request->uv, file, permissions, FsRequest::callback);
             if (result < 0)
             {
-                Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+                callbacks->fail(hx::asys::libuv::uv_err_to_enum(result));
             }
             else
             {
@@ -472,7 +492,7 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::setPermissions(int permissions,
 
 void hx::asys::libuv::filesystem::LibuvFile_obj::setOwner(int user, int group, Dynamic cbSuccess, Dynamic cbFailure)
 {
-    class SetOwnerWork final : public hx::asys::libuv::WorkRequest
+    class SetOwnerWork final : public hx::asys::libuv::CallbackWorkRequest
     {
         const uv_file file;
         const int user;
@@ -480,7 +500,7 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::setOwner(int user, int group, D
 
     public:
         SetOwnerWork(const uv_file _file, const int _user, const int _group, Dynamic _cbSuccess, Dynamic _cbFailure)
-            : WorkRequest(_cbSuccess, _cbFailure)
+            : CallbackWorkRequest(_cbSuccess, _cbFailure)
             , file(_file)
             , user(_user)
             , group(_group) {}
@@ -488,11 +508,11 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::setOwner(int user, int group, D
         void run(uv_loop_t* loop) override
         {
             auto gcZone  = hx::AutoGCZone();
-            auto request = std::make_unique<FsRequest>(cbSuccess.rooted, cbFailure.rooted);
+            auto request = std::make_unique<FsRequest>(callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted);
             auto result  = uv_fs_fchown(loop, &request->uv, file, user, group, FsRequest::callback);
             if (result < 0)
             {
-                Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+                callbacks->fail(hx::asys::libuv::uv_err_to_enum(result));
             }
             else
             {
@@ -508,7 +528,7 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::setOwner(int user, int group, D
 
 void hx::asys::libuv::filesystem::LibuvFile_obj::setTimes(int accessTime, int modificationTime, Dynamic cbSuccess, Dynamic cbFailure)
 {
-    class SetTimesWork final : public hx::asys::libuv::WorkRequest
+    class SetTimesWork final : public hx::asys::libuv::CallbackWorkRequest
     {
         const uv_file file;
         const int accessTime;
@@ -516,7 +536,7 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::setTimes(int accessTime, int mo
 
     public:
         SetTimesWork(const uv_file _file, const int _accessTime, const int _modificationTime, Dynamic _cbSuccess, Dynamic _cbFailure)
-            : WorkRequest(_cbSuccess, _cbFailure)
+            : CallbackWorkRequest(_cbSuccess, _cbFailure)
             , file(_file)
             , accessTime(_accessTime)
             , modificationTime(_modificationTime) { }
@@ -524,11 +544,11 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::setTimes(int accessTime, int mo
         void run(uv_loop_t* loop) override
         {
             auto gcZone  = hx::AutoGCZone();
-            auto request = std::make_unique<FsRequest>(cbSuccess.rooted, cbFailure.rooted);
+            auto request = std::make_unique<FsRequest>(callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted);
             auto result  = uv_fs_futime(loop, &request->uv, file, accessTime, modificationTime, FsRequest::callback);
             if (result < 0)
             {
-                Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+                callbacks->fail(hx::asys::libuv::uv_err_to_enum(result));
             }
             else
             {
@@ -544,21 +564,23 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::setTimes(int accessTime, int mo
 
 void hx::asys::libuv::filesystem::LibuvFile_obj::flush(Dynamic cbSuccess, Dynamic cbFailure)
 {
-    class FlushWork final : public hx::asys::libuv::WorkRequest
+    class FlushWork final : public hx::asys::libuv::CallbackWorkRequest
     {
         const uv_file file;
 
     public:
-        FlushWork(const uv_file _file, Dynamic _cbSuccess, Dynamic _cbFailure) : WorkRequest(_cbSuccess, _cbFailure), file(_file) {}
+        FlushWork(const uv_file _file, Dynamic _cbSuccess, Dynamic _cbFailure)
+            : CallbackWorkRequest(_cbSuccess, _cbFailure)
+            , file(_file) {}
 
         void run(uv_loop_t* loop) override
         {
             auto gcZone  = hx::AutoGCZone();
-            auto request = std::make_unique<FsRequest>(cbSuccess.rooted, cbFailure.rooted);
+            auto request = std::make_unique<FsRequest>(callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted);
             auto result  = uv_fs_fsync(loop, &request->uv, file, FsRequest::callback);
             if (result < 0)
             {
-                Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+                callbacks->fail(hx::asys::libuv::uv_err_to_enum(result));
             }
             else
             {
@@ -574,21 +596,23 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::flush(Dynamic cbSuccess, Dynami
 
 void hx::asys::libuv::filesystem::LibuvFile_obj::close(Dynamic cbSuccess, Dynamic cbFailure)
 {
-    class CloseWork final : public hx::asys::libuv::WorkRequest
+    class CloseWork final : public hx::asys::libuv::CallbackWorkRequest
     {
         const uv_file file;
 
     public:
-        CloseWork(const uv_file _file, Dynamic _cbSuccess, Dynamic _cbFailure) : WorkRequest(_cbSuccess, _cbFailure), file(_file) {}
+        CloseWork(const uv_file _file, Dynamic _cbSuccess, Dynamic _cbFailure)
+            : CallbackWorkRequest(_cbSuccess, _cbFailure)
+            , file(_file) {}
 
         void run(uv_loop_t* loop) override
         {
             auto gcZone  = hx::AutoGCZone();
-            auto request = std::make_unique<FsRequest>(cbSuccess.rooted, cbFailure.rooted);
+            auto request = std::make_unique<FsRequest>(callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted);
             auto result  = uv_fs_close(loop, &request->uv, file, FsRequest::callback);
             if (result < 0)
             {
-                Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+                callbacks->fail(hx::asys::libuv::uv_err_to_enum(result));
             }
             else
             {
@@ -604,6 +628,8 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::close(Dynamic cbSuccess, Dynami
 
         return;
     }
+
+    _hx_set_finalizer(this, nullptr);
 
     auto ctx = static_cast<LibuvAsysContext_obj::Ctx*>(loop->data);
 

@@ -36,7 +36,7 @@ namespace
 		}
 	};
 
-	class WriteWork final : public hx::asys::libuv::WorkRequest
+	class WriteWork final : public hx::asys::libuv::CallbackWorkRequest
 	{
 		uv_stream_t* stream;
 		std::unique_ptr<hx::ArrayPin> pin;
@@ -45,7 +45,7 @@ namespace
 
 	public:
 		WriteWork(Dynamic _cbSuccess, Dynamic _cbFailure, uv_stream_t* _stream, hx::ArrayPin* _pin, char* _base, int _length)
-			: WorkRequest(_cbSuccess, _cbFailure)
+			: CallbackWorkRequest(_cbSuccess, _cbFailure)
 			, stream(_stream)
 			, pin(_pin)
 			, base(_base)
@@ -53,12 +53,12 @@ namespace
 
 		void run(uv_loop_t* loop) override
 		{
-			auto request = std::make_unique<WriteRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(pin), uv_buf_init(base, length));
+			auto request = std::make_unique<WriteRequest>(callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted, std::move(pin), uv_buf_init(base, length));
 			auto result  = uv_write(&request->request, stream, &request->buffer, 1, WriteRequest::callback);
 
 			if (result < 0)
 			{
-				Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+				callbacks->fail(hx::asys::libuv::uv_err_to_enum(result));
 			}
 			else
 			{

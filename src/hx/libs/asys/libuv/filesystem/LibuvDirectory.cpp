@@ -99,28 +99,28 @@ namespace
                 }
             };
 
-            class NextWork final : public hx::asys::libuv::WorkRequest
+            class NextWork final : public hx::asys::libuv::CallbackWorkRequest
             {
                 uv_dir_t* dir;
                 const int batch;
 
             public:
                 NextWork(Dynamic _cbSuccess, Dynamic _cbFailure, uv_dir_t* _dir, const int _batch)
-                    : WorkRequest(_cbSuccess, _cbFailure)
+                    : CallbackWorkRequest(_cbSuccess, _cbFailure)
                     , dir(_dir)
                     , batch(_batch) {}
 
                 void run(uv_loop_t* loop) override
                 {
                     auto gcZone  = hx::AutoGCZone();
-                    auto request = std::make_unique<NextRequest>(cbSuccess.rooted, cbFailure.rooted, batch);
+                    auto request = std::make_unique<NextRequest>(callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted, batch);
                     dir->nentries = request->entries.capacity();
                     dir->dirents  = request->entries.data();
 
                     auto result = uv_fs_readdir(loop, &request->uv, dir, NextRequest::onCallback);
                     if (result < 0)
                     {
-                        Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+                        callbacks->fail(hx::asys::libuv::uv_err_to_enum(result));
                     }
                     else
                     {
@@ -136,21 +136,21 @@ namespace
 
         void close(Dynamic cbSuccess, Dynamic cbFailure) override
         {
-            class CloseWork final : public hx::asys::libuv::WorkRequest
+            class CloseWork final : public hx::asys::libuv::CallbackWorkRequest
             {
                 uv_dir_t* dir;
 
             public:
-                CloseWork(Dynamic _cbSuccess, Dynamic _cbFailure, uv_dir_t* _dir) : WorkRequest(_cbSuccess, _cbFailure), dir(_dir) {}
+                CloseWork(Dynamic _cbSuccess, Dynamic _cbFailure, uv_dir_t* _dir) : CallbackWorkRequest(_cbSuccess, _cbFailure), dir(_dir) {}
 
                 void run(uv_loop_t* loop) override
                 {
                     auto gcZone  = hx::AutoGCZone();
-                    auto request = std::make_unique<hx::asys::libuv::filesystem::FsRequest>(cbSuccess.rooted, cbFailure.rooted);
+                    auto request = std::make_unique<hx::asys::libuv::filesystem::FsRequest>(callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted);
                     auto result  = uv_fs_closedir(loop, &request->uv, dir, hx::asys::libuv::filesystem::FsRequest::callback);
                     if (result < 0)
                     {
-                        Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+                        callbacks->fail(hx::asys::libuv::uv_err_to_enum(result));
                     }
                     else
                     {
@@ -202,25 +202,25 @@ void hx::asys::filesystem::Directory_obj::open(Context ctx, String path, Dynamic
         }
     };
 
-    class OpenWork final : public hx::asys::libuv::WorkRequest
+    class OpenWork final : public hx::asys::libuv::CallbackWorkRequest
     {
         std::unique_ptr<hx::strbuf> pathBuffer;
         const char* path;
 
     public:
         OpenWork(Dynamic _cbSuccess, Dynamic _cbFailure, std::unique_ptr<hx::strbuf> _pathBuffer, const char* _path)
-            : WorkRequest(_cbSuccess, _cbFailure)
+            : CallbackWorkRequest(_cbSuccess, _cbFailure)
             , pathBuffer(std::move(_pathBuffer))
             , path(_path) {}
 
         void run(uv_loop_t* loop) override
         {
             auto gcZone  = hx::AutoGCZone();
-            auto request = std::make_unique<OpenRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(pathBuffer));
+            auto request = std::make_unique<OpenRequest>(callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted, std::move(pathBuffer));
             auto result  = uv_fs_opendir(loop, &request->uv, path, OpenRequest::onCallback);
             if (result < 0)
             {
-                Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+                callbacks->fail(hx::asys::libuv::uv_err_to_enum(result));
             }
             else
             {
@@ -249,7 +249,7 @@ void hx::asys::filesystem::Directory_obj::create(Context ctx, String path, int p
         }
     };
 
-    class CreateWork final : public hx::asys::libuv::WorkRequest
+    class CreateWork final : public hx::asys::libuv::CallbackWorkRequest
     {
         std::unique_ptr<hx::strbuf> pathBuffer;
         const char* path;
@@ -257,7 +257,7 @@ void hx::asys::filesystem::Directory_obj::create(Context ctx, String path, int p
 
     public:
         CreateWork(Dynamic _cbSuccess, Dynamic _cbFailure, std::unique_ptr<hx::strbuf> _pathBuffer, const char* _path, const int _flags)
-            : WorkRequest(_cbSuccess, _cbFailure)
+            : CallbackWorkRequest(_cbSuccess, _cbFailure)
             , pathBuffer(std::move(_pathBuffer))
             , path(_path)
             , flags(_flags) { }
@@ -265,11 +265,11 @@ void hx::asys::filesystem::Directory_obj::create(Context ctx, String path, int p
         void run(uv_loop_t* loop) override
         {
             auto gcZone  = hx::AutoGCZone();
-            auto request = std::make_unique<CreateRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(pathBuffer));
+            auto request = std::make_unique<CreateRequest>(callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted, std::move(pathBuffer));
             auto result  = uv_fs_mkdir(loop, &request->uv, path, flags, hx::asys::libuv::filesystem::FsRequest::callback);
             if (result < 0)
             {
-                Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+                callbacks->fail(hx::asys::libuv::uv_err_to_enum(result));
             }
             else
             {
@@ -299,7 +299,7 @@ void hx::asys::filesystem::Directory_obj::rename(Context ctx, String oldPath, St
             , newPathBuffer(std::move(_newPathBuffer)) {}
     };
 
-    class RenameWork final : public hx::asys::libuv::WorkRequest
+    class RenameWork final : public hx::asys::libuv::CallbackWorkRequest
     {
         std::unique_ptr<hx::strbuf> oldPathBuffer;
         std::unique_ptr<hx::strbuf> newPathBuffer;
@@ -308,7 +308,7 @@ void hx::asys::filesystem::Directory_obj::rename(Context ctx, String oldPath, St
 
     public:
         RenameWork(Dynamic _cbSuccess, Dynamic _cbFailure, std::unique_ptr<hx::strbuf> _oldPathBuffer, std::unique_ptr<hx::strbuf> _newPathBuffer, const char* _oldPath, const char* _newPath)
-            : WorkRequest(_cbSuccess, _cbFailure)
+            : CallbackWorkRequest(_cbSuccess, _cbFailure)
             , newPathBuffer(std::move(_newPathBuffer))
             , oldPathBuffer(std::move(_oldPathBuffer))
             , newPath(_newPath)
@@ -317,11 +317,11 @@ void hx::asys::filesystem::Directory_obj::rename(Context ctx, String oldPath, St
         void run(uv_loop_t* loop) override
         {
             auto gcZone  = hx::AutoGCZone();
-            auto request = std::make_unique<RenameRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(oldPathBuffer), std::move(newPathBuffer));
+            auto request = std::make_unique<RenameRequest>(callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted, std::move(oldPathBuffer), std::move(newPathBuffer));
             auto result  = uv_fs_rename(loop, &request->uv, oldPath, newPath, hx::asys::libuv::filesystem::FsRequest::callback);
             if (result < 0)
             {
-                Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+                callbacks->fail(hx::asys::libuv::uv_err_to_enum(result));
             }
             else
             {
@@ -370,7 +370,7 @@ void hx::asys::filesystem::Directory_obj::check(Context ctx, String path, FileAc
         }
     };
 
-    class CheckWork final : public hx::asys::libuv::WorkRequest
+    class CheckWork final : public hx::asys::libuv::CallbackWorkRequest
     {
         std::unique_ptr<hx::strbuf> pathBuffer;
         const char* path;
@@ -378,7 +378,7 @@ void hx::asys::filesystem::Directory_obj::check(Context ctx, String path, FileAc
 
     public:
         CheckWork(Dynamic _cbSuccess, Dynamic _cbFailure, std::unique_ptr<hx::strbuf> _pathBuffer, const char* _path, const int _flags)
-            : WorkRequest(_cbSuccess, _cbFailure)
+            : CallbackWorkRequest(_cbSuccess, _cbFailure)
             , pathBuffer(std::move(_pathBuffer))
             , path(_path)
             , flags(_flags) {}
@@ -386,11 +386,11 @@ void hx::asys::filesystem::Directory_obj::check(Context ctx, String path, FileAc
         void run(uv_loop_t* loop) override
         {
             auto gcZone  = hx::AutoGCZone();
-            auto request = std::make_unique<CheckRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(pathBuffer));
+            auto request = std::make_unique<CheckRequest>(callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted, std::move(pathBuffer));
             auto result  = uv_fs_access(loop, &request->uv, path, flags, CheckRequest::onCallback);
             if (result < 0)
             {
-                Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+                callbacks->fail(hx::asys::libuv::uv_err_to_enum(result));
             }
             else
             {
@@ -437,25 +437,25 @@ void hx::asys::filesystem::Directory_obj::deleteFile(Context ctx, String path, D
         }
     };
 
-    class DeleteFileWork final : public hx::asys::libuv::WorkRequest
+    class DeleteFileWork final : public hx::asys::libuv::CallbackWorkRequest
     {
         std::unique_ptr<hx::strbuf> pathBuffer;
         const char* path;
 
     public:
         DeleteFileWork(Dynamic _cbSuccess, Dynamic _cbFailure, std::unique_ptr<hx::strbuf> _pathBuffer, const char* _path)
-            : WorkRequest(_cbSuccess, _cbFailure)
+            : CallbackWorkRequest(_cbSuccess, _cbFailure)
             , pathBuffer(std::move(_pathBuffer))
             , path(_path) {}
 
         void run(uv_loop_t* loop) override
         {
             auto gcZone  = hx::AutoGCZone();
-            auto request = std::make_unique<DeleteFileRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(pathBuffer));
+            auto request = std::make_unique<DeleteFileRequest>(callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted, std::move(pathBuffer));
             auto result  = uv_fs_unlink(loop, &request->uv, path, hx::asys::libuv::filesystem::FsRequest::callback);
             if (result < 0)
             {
-                Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+                callbacks->fail(hx::asys::libuv::uv_err_to_enum(result));
             }
             else
             {
@@ -484,14 +484,14 @@ void hx::asys::filesystem::Directory_obj::deleteDirectory(Context ctx, String pa
         }
     };
 
-    class DeleteDirectoryWork final : public hx::asys::libuv::WorkRequest
+    class DeleteDirectoryWork final : public hx::asys::libuv::CallbackWorkRequest
     {
         std::unique_ptr<hx::strbuf> pathBuffer;
         const char* path;
 
     public:
         DeleteDirectoryWork(Dynamic _cbSuccess, Dynamic _cbFailure, std::unique_ptr<hx::strbuf> _pathBuffer, const char* _path)
-            : WorkRequest(_cbSuccess, _cbFailure)
+            : CallbackWorkRequest(_cbSuccess, _cbFailure)
             , pathBuffer(std::move(_pathBuffer))
             , path(_path) {
         }
@@ -499,11 +499,11 @@ void hx::asys::filesystem::Directory_obj::deleteDirectory(Context ctx, String pa
         void run(uv_loop_t* loop) override
         {
             auto gcZone  = hx::AutoGCZone();
-            auto request = std::make_unique<DeleteDirectoryRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(pathBuffer));
+            auto request = std::make_unique<DeleteDirectoryRequest>(callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted, std::move(pathBuffer));
             auto result  = uv_fs_rmdir(loop, &request->uv, path, hx::asys::libuv::filesystem::FsRequest::callback);
             if (result < 0)
             {
-                Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+                callbacks->fail(hx::asys::libuv::uv_err_to_enum(result));
             }
             else
             {
@@ -532,14 +532,14 @@ void hx::asys::filesystem::Directory_obj::isDirectory(Context ctx, String path, 
         }
     };
 
-    class Work final : public hx::asys::libuv::WorkRequest
+    class Work final : public hx::asys::libuv::CallbackWorkRequest
     {
         std::unique_ptr<hx::strbuf> pathBuffer;
         const char* path;
 
     public:
         Work(Dynamic _cbSuccess, Dynamic _cbFailure, std::unique_ptr<hx::strbuf> _pathBuffer, const char* _path)
-            : WorkRequest(_cbSuccess, _cbFailure)
+            : CallbackWorkRequest(_cbSuccess, _cbFailure)
             , pathBuffer(std::move(_pathBuffer))
             , path(_path) {
         }
@@ -547,12 +547,12 @@ void hx::asys::filesystem::Directory_obj::isDirectory(Context ctx, String path, 
         void run(uv_loop_t* loop) override
         {
             auto gcZone  = hx::AutoGCZone();
-            auto request = std::make_unique<Request>(cbSuccess.rooted, cbFailure.rooted, std::move(pathBuffer));
+            auto request = std::make_unique<Request>(callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted, std::move(pathBuffer));
             auto wrapper = [](uv_fs_t* request) { check_type_callback(S_IFDIR, request); };
             auto result  = uv_fs_stat(loop , &request->uv, path, wrapper);
             if (result < 0)
             {
-                Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+                callbacks->fail(hx::asys::libuv::uv_err_to_enum(result));
             }
             else
             {
@@ -581,14 +581,14 @@ void hx::asys::filesystem::Directory_obj::isFile(Context ctx, String path, Dynam
         }
     };
 
-    class Work final : public hx::asys::libuv::WorkRequest
+    class Work final : public hx::asys::libuv::CallbackWorkRequest
     {
         std::unique_ptr<hx::strbuf> pathBuffer;
         const char* path;
 
     public:
         Work(Dynamic _cbSuccess, Dynamic _cbFailure, std::unique_ptr<hx::strbuf> _pathBuffer, const char* _path)
-            : WorkRequest(_cbSuccess, _cbFailure)
+            : CallbackWorkRequest(_cbSuccess, _cbFailure)
             , pathBuffer(std::move(_pathBuffer))
             , path(_path) {
         }
@@ -596,12 +596,12 @@ void hx::asys::filesystem::Directory_obj::isFile(Context ctx, String path, Dynam
         void run(uv_loop_t* loop) override
         {
             auto gcZone  = hx::AutoGCZone();
-            auto request = std::make_unique<Request>(cbSuccess.rooted, cbFailure.rooted, std::move(pathBuffer));
+            auto request = std::make_unique<Request>(callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted, std::move(pathBuffer));
             auto wrapper = [](uv_fs_t* request) { check_type_callback(S_IFREG, request); };
             auto result  = uv_fs_stat(loop, &request->uv, path, wrapper);
             if (result < 0)
             {
-                Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+                callbacks->fail(hx::asys::libuv::uv_err_to_enum(result));
             }
             else
             {
@@ -630,14 +630,14 @@ void hx::asys::filesystem::Directory_obj::isLink(Context ctx, String path, Dynam
         }
     };
 
-    class Work final : public hx::asys::libuv::WorkRequest
+    class Work final : public hx::asys::libuv::CallbackWorkRequest
     {
         std::unique_ptr<hx::strbuf> pathBuffer;
         const char* path;
 
     public:
         Work(Dynamic _cbSuccess, Dynamic _cbFailure, std::unique_ptr<hx::strbuf> _pathBuffer, const char* _path)
-            : WorkRequest(_cbSuccess, _cbFailure)
+            : CallbackWorkRequest(_cbSuccess, _cbFailure)
             , pathBuffer(std::move(_pathBuffer))
             , path(_path) {
         }
@@ -645,12 +645,12 @@ void hx::asys::filesystem::Directory_obj::isLink(Context ctx, String path, Dynam
         void run(uv_loop_t* loop) override
         {
             auto gcZone  = hx::AutoGCZone();
-            auto request = std::make_unique<Request>(cbSuccess.rooted, cbFailure.rooted, std::move(pathBuffer));
+            auto request = std::make_unique<Request>(callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted, std::move(pathBuffer));
             auto wrapper = [](uv_fs_t* request) { check_type_callback(S_IFLNK, request); };
             auto result  = uv_fs_stat(loop, &request->uv, path, wrapper);
             if (result < 0)
             {
-                Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+                callbacks->fail(hx::asys::libuv::uv_err_to_enum(result));
             }
             else
             {
@@ -678,7 +678,7 @@ void hx::asys::filesystem::Directory_obj::setLinkOwner(Context ctx, String path,
             , pathBuffer(std::move(_pathBuffer)) {}
     };
 
-    class SetLinkOwnerWork final : public hx::asys::libuv::WorkRequest
+    class SetLinkOwnerWork final : public hx::asys::libuv::CallbackWorkRequest
     {
         std::unique_ptr<hx::strbuf> pathBuffer;
         const char* path;
@@ -687,7 +687,7 @@ void hx::asys::filesystem::Directory_obj::setLinkOwner(Context ctx, String path,
 
     public:
         SetLinkOwnerWork(Dynamic _cbSuccess, Dynamic _cbFailure, std::unique_ptr<hx::strbuf> _pathBuffer, const char* _path, const int _user, const int _group)
-            : WorkRequest(_cbSuccess, _cbFailure)
+            : CallbackWorkRequest(_cbSuccess, _cbFailure)
             , pathBuffer(std::move(_pathBuffer))
             , path(_path)
             , user(_user)
@@ -696,11 +696,11 @@ void hx::asys::filesystem::Directory_obj::setLinkOwner(Context ctx, String path,
         void run(uv_loop_t* loop) override
         {
             auto gcZone  = hx::AutoGCZone();
-            auto request = std::make_unique<SetLinkOwnerRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(pathBuffer));
+            auto request = std::make_unique<SetLinkOwnerRequest>(callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted, std::move(pathBuffer));
             auto result  = uv_fs_lchown(loop, &request->uv, path, user, group, hx::asys::libuv::filesystem::FsRequest::callback);
             if (result < 0)
             {
-                Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+                callbacks->fail(hx::asys::libuv::uv_err_to_enum(result));
             }
             else
             {
@@ -730,7 +730,7 @@ void hx::asys::filesystem::Directory_obj::link(Context ctx, String target, Strin
             , pathBuffer(std::move(_pathBuffer)) {}
     };
 
-    class LinkWork final : public hx::asys::libuv::WorkRequest
+    class LinkWork final : public hx::asys::libuv::CallbackWorkRequest
     {
         std::unique_ptr<hx::strbuf> targetBuffer;
         std::unique_ptr<hx::strbuf> pathBuffer;
@@ -740,7 +740,7 @@ void hx::asys::filesystem::Directory_obj::link(Context ctx, String target, Strin
 
     public:
         LinkWork(Dynamic _cbSuccess, Dynamic _cbFailure, std::unique_ptr<hx::strbuf> _targetBuffer, std::unique_ptr<hx::strbuf> _pathBuffer, const char* _target, const char* _path, const int _type)
-            : WorkRequest(_cbSuccess, _cbFailure)
+            : CallbackWorkRequest(_cbSuccess, _cbFailure)
             , targetBuffer(std::move(_targetBuffer))
             , pathBuffer(std::move(_pathBuffer))
             , target(_target)
@@ -750,13 +750,13 @@ void hx::asys::filesystem::Directory_obj::link(Context ctx, String target, Strin
         void run(uv_loop_t* loop) override
         {
             auto gcZone  = hx::AutoGCZone();
-            auto request = std::make_unique<LinkRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(targetBuffer), std::move(pathBuffer));
+            auto request = std::make_unique<LinkRequest>(callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted, std::move(targetBuffer), std::move(pathBuffer));
             auto result  = type == 0
                 ? uv_fs_link(loop, &request->uv, target, path, hx::asys::libuv::filesystem::FsRequest::callback)
                 : uv_fs_symlink(loop, &request->uv, target, path, 0, hx::asys::libuv::filesystem::FsRequest::callback);
             if (result < 0)
             {
-                Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+                callbacks->fail(hx::asys::libuv::uv_err_to_enum(result));
             }
             else
             {
@@ -817,14 +817,14 @@ void hx::asys::filesystem::Directory_obj::linkInfo(Context ctx, String path, Dyn
         }
     };
 
-    class LinkInfoWork final : public hx::asys::libuv::WorkRequest
+    class LinkInfoWork final : public hx::asys::libuv::CallbackWorkRequest
     {
         std::unique_ptr<hx::strbuf> pathBuffer;
         const char* path;
 
     public:
         LinkInfoWork(Dynamic _cbSuccess, Dynamic _cbFailure, std::unique_ptr<hx::strbuf> _pathBuffer, const char* _path)
-            : WorkRequest(_cbSuccess, _cbFailure)
+            : CallbackWorkRequest(_cbSuccess, _cbFailure)
             , pathBuffer(std::move(_pathBuffer))
             , path(_path) {
         }
@@ -832,11 +832,11 @@ void hx::asys::filesystem::Directory_obj::linkInfo(Context ctx, String path, Dyn
         void run(uv_loop_t* loop) override
         {
             auto gcZone  = hx::AutoGCZone();
-            auto request = std::make_unique<LinkInfoRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(pathBuffer));
+            auto request = std::make_unique<LinkInfoRequest>(callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted, std::move(pathBuffer));
             auto result  = uv_fs_lstat(loop, &request->uv, path, LinkInfoRequest::onCallback);
             if (result < 0)
             {
-                Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+                callbacks->fail(hx::asys::libuv::uv_err_to_enum(result));
             }
             else
             {
@@ -865,14 +865,14 @@ void hx::asys::filesystem::Directory_obj::readLink(Context ctx, String path, Dyn
         }
     };
 
-    class ReadLinkWork final : public hx::asys::libuv::WorkRequest
+    class ReadLinkWork final : public hx::asys::libuv::CallbackWorkRequest
     {
         std::unique_ptr<hx::strbuf> pathBuffer;
         const char* path;
 
     public:
         ReadLinkWork(Dynamic _cbSuccess, Dynamic _cbFailure, std::unique_ptr<hx::strbuf> _pathBuffer, const char* _path)
-            : WorkRequest(_cbSuccess, _cbFailure)
+            : CallbackWorkRequest(_cbSuccess, _cbFailure)
             , pathBuffer(std::move(_pathBuffer))
             , path(_path) {
         }
@@ -880,11 +880,11 @@ void hx::asys::filesystem::Directory_obj::readLink(Context ctx, String path, Dyn
         void run(uv_loop_t* loop) override
         {
             auto gcZone  = hx::AutoGCZone();
-            auto request = std::make_unique<ReadLinkRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(pathBuffer));
+            auto request = std::make_unique<ReadLinkRequest>(callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted, std::move(pathBuffer));
             auto result  = uv_fs_readlink(loop, &request->uv, path, path_callback);
             if (result < 0)
             {
-                Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+                callbacks->fail(hx::asys::libuv::uv_err_to_enum(result));
             }
             else
             {
@@ -914,7 +914,7 @@ void hx::asys::filesystem::Directory_obj::copyFile(Context ctx, String source, S
             , dstPathBuffer(std::move(_dstPathBuffer)) {}
     };
 
-    class CopyFileWork final : public hx::asys::libuv::WorkRequest
+    class CopyFileWork final : public hx::asys::libuv::CallbackWorkRequest
     {
         std::unique_ptr<hx::strbuf> srcPathBuffer;
         std::unique_ptr<hx::strbuf> dstPathBuffer;
@@ -923,7 +923,7 @@ void hx::asys::filesystem::Directory_obj::copyFile(Context ctx, String source, S
 
     public:
         CopyFileWork(Dynamic _cbSuccess, Dynamic _cbFailure, std::unique_ptr<hx::strbuf> _srcPathBuffer, std::unique_ptr<hx::strbuf> _dstPathBuffer, const char* _srcPath, const char* _dstPath)
-            : WorkRequest(_cbSuccess, _cbFailure)
+            : CallbackWorkRequest(_cbSuccess, _cbFailure)
             , srcPathBuffer(std::move(_srcPathBuffer))
             , dstPathBuffer(std::move(_dstPathBuffer))
             , srcPath(_srcPath)
@@ -932,11 +932,11 @@ void hx::asys::filesystem::Directory_obj::copyFile(Context ctx, String source, S
         void run(uv_loop_t* loop) override
         {
             auto gcZone  = hx::AutoGCZone();
-            auto request = std::make_unique<CopyFileRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(srcPathBuffer), std::move(dstPathBuffer));
+            auto request = std::make_unique<CopyFileRequest>(callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted, std::move(srcPathBuffer), std::move(dstPathBuffer));
             auto result  = uv_fs_rename(loop, &request->uv, srcPath, dstPath, hx::asys::libuv::filesystem::FsRequest::callback);
             if (result < 0)
             {
-                Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+                callbacks->fail(hx::asys::libuv::uv_err_to_enum(result));
             }
             else
             {
@@ -966,25 +966,25 @@ void hx::asys::filesystem::Directory_obj::realPath(Context ctx, String path, Dyn
             , pathBuffer(std::move(_pathBuffer)) {}
     };
 
-    class RealPathWork final : public hx::asys::libuv::WorkRequest
+    class RealPathWork final : public hx::asys::libuv::CallbackWorkRequest
     {
         std::unique_ptr<hx::strbuf> pathBuffer;
         const char* path;
 
     public:
         RealPathWork(Dynamic _cbSuccess, Dynamic _cbFailure, std::unique_ptr<hx::strbuf> _pathBuffer, const char* _path)
-            : WorkRequest(_cbSuccess, _cbFailure)
+            : CallbackWorkRequest(_cbSuccess, _cbFailure)
             , pathBuffer(std::move(_pathBuffer))
             , path(_path) {}
 
         void run(uv_loop_t* loop) override
         {
             auto gcZone  = hx::AutoGCZone();
-            auto request = std::make_unique<RealPathRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(pathBuffer));
+            auto request = std::make_unique<RealPathRequest>(callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted, std::move(pathBuffer));
             auto result  = uv_fs_realpath(loop, &request->uv, path, path_callback);
             if (result < 0)
             {
-                Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+                callbacks->fail(hx::asys::libuv::uv_err_to_enum(result));
             }
             else
             {

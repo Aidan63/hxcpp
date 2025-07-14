@@ -83,7 +83,7 @@ namespace
 		}
 	};
 
-	class TcpConnectWork : public hx::asys::libuv::WorkRequest
+	class TcpConnectWork : public hx::asys::libuv::CallbackWorkRequest
 	{
 		const std::optional<int> keepAlive;
 		const std::optional<int> sendBuffer;
@@ -93,7 +93,7 @@ namespace
 
 	public:
 		TcpConnectWork(Dynamic _cbSuccess, Dynamic _cbFailure, std::optional<int> _keepAlive, std::optional<int> _sendBuffer, std::optional<int> _recvBuffer)
-			: WorkRequest(_cbSuccess, _cbFailure)
+			: CallbackWorkRequest(_cbSuccess, _cbFailure)
 			, keepAlive(_keepAlive)
 			, sendBuffer(_sendBuffer)
 			, recvBuffer(_recvBuffer) {
@@ -107,14 +107,14 @@ namespace
 
 			if ((result = uv_tcp_init(loop, tcp.get())) < 0)
 			{
-				Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+				callbacks->fail(hx::asys::libuv::uv_err_to_enum(result));
 
 				return;
 			}
 
 			if ((result = uv_tcp_keepalive(tcp.get(), keepAlive.has_value(), keepAlive.value_or(0))) < 0)
 			{
-				ConnectFailedRequest::cleanup(std::move(tcp), result, cbSuccess.rooted, cbFailure.rooted);
+				ConnectFailedRequest::cleanup(std::move(tcp), result, callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted);
 
 				return;
 			}
@@ -124,7 +124,7 @@ namespace
 				auto value = sendBuffer.value();
 				if ((result = uv_send_buffer_size(reinterpret_cast<uv_handle_t*>(tcp.get()), &value)) < 0)
 				{
-					ConnectFailedRequest::cleanup(std::move(tcp), result, cbSuccess.rooted, cbFailure.rooted);
+					ConnectFailedRequest::cleanup(std::move(tcp), result, callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted);
 
 					return;
 				}
@@ -135,16 +135,16 @@ namespace
 				auto value = recvBuffer.value();
 				if ((result = uv_recv_buffer_size(reinterpret_cast<uv_handle_t*>(tcp.get()), &value)) < 0)
 				{
-					ConnectFailedRequest::cleanup(std::move(tcp), result, cbSuccess.rooted, cbFailure.rooted);
+					ConnectFailedRequest::cleanup(std::move(tcp), result, callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted);
 
 					return;
 				}
 			}
 
-			auto request = std::make_unique<ConnectRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(tcp));
+			auto request = std::make_unique<ConnectRequest>(callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted, std::move(tcp));
 			if ((result = uv_tcp_connect(&request->connect, request->tcp.get(), address(), ConnectRequest::onCallback)) < 0)
 			{
-				ConnectFailedRequest::cleanup(std::move(request->tcp), result, cbSuccess.rooted, cbFailure.rooted);
+				ConnectFailedRequest::cleanup(std::move(request->tcp), result, callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted);
 
 				return;
 			}
@@ -303,22 +303,24 @@ void hx::asys::libuv::net::LibuvTcpSocket::close(Dynamic cbSuccess, Dynamic cbFa
 		}
 	};
 
-	class CloseWork final : public hx::asys::libuv::WorkRequest
+	class CloseWork final : public hx::asys::libuv::CallbackWorkRequest
 	{
 		std::unique_ptr<uv_tcp_t> tcp;
 
 	public:
-		CloseWork(Dynamic _cbSuccess, Dynamic _cbFailure, std::unique_ptr<uv_tcp_t> _tcp) : WorkRequest(_cbSuccess, _cbFailure), tcp(std::move(_tcp)) {}
+		CloseWork(Dynamic _cbSuccess, Dynamic _cbFailure, std::unique_ptr<uv_tcp_t> _tcp)
+			: CallbackWorkRequest(_cbSuccess, _cbFailure)
+			, tcp(std::move(_tcp)) {}
 
 		void run(uv_loop_t* loop) override
 		{
 			auto gcZone  = hx::AutoGCZone();
-			auto request = std::make_unique<CloseRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(tcp));
+			auto request = std::make_unique<CloseRequest>(callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted, std::move(tcp));
 			auto result  = uv_shutdown(&request->shutdown, reinterpret_cast<uv_stream_t*>(request->tcp.get()), CloseRequest::onShutdownCallback);
 			if (result < 0)
 			{
 
-				Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+				callbacks->fail(hx::asys::libuv::uv_err_to_enum(result));
 			}
 			else
 			{

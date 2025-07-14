@@ -100,14 +100,14 @@ void hx::asys::net::dns::resolve(Context ctx, String host, Dynamic cbSuccess, Dy
         }
     };
 
-    class ResolveWork final : public hx::asys::libuv::WorkRequest
+    class ResolveWork final : public hx::asys::libuv::CallbackWorkRequest
     {
         std::unique_ptr<hx::strbuf> hostBuffer;
         const char* host;
 
     public:
         ResolveWork(Dynamic _cbSuccess, Dynamic _cbFailure, std::unique_ptr<hx::strbuf> _hostBuffer, const char* _host)
-            : WorkRequest(_cbSuccess, _cbFailure)
+            : CallbackWorkRequest(_cbSuccess, _cbFailure)
             , hostBuffer(std::move(_hostBuffer))
             , host(_host) {}
 
@@ -119,11 +119,11 @@ void hx::asys::net::dns::resolve(Context ctx, String host, Dynamic cbSuccess, Dy
             hints.ai_protocol = IPPROTO_TCP;
             hints.ai_flags    = 0;
 
-            auto request = std::make_unique<ResolveRequest>(cbSuccess.rooted, cbFailure.rooted, std::move(hostBuffer));
+            auto request = std::make_unique<ResolveRequest>(callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted, std::move(hostBuffer));
             auto result  = uv_getaddrinfo(loop, &request->uv, ResolveRequest::onCallback, host, nullptr, &hints);
             if (result < 0)
             {
-                Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+                callbacks->fail(hx::asys::libuv::uv_err_to_enum(result));
             }
             else
             {
@@ -141,23 +141,22 @@ void hx::asys::net::dns::resolve(Context ctx, String host, Dynamic cbSuccess, Dy
 
 void hx::asys::net::dns::reverse(Context ctx, const Ipv4Address ip, Dynamic cbSuccess, Dynamic cbFailure)
 {
-    class ReverseWork final : public hx::asys::libuv::WorkRequest
+    class ReverseWork final : public hx::asys::libuv::CallbackWorkRequest
     {
         sockaddr_in addr;
 
     public:
-        ReverseWork(Dynamic _cbSuccess, Dynamic _cbFailure, sockaddr_in _addr) : WorkRequest(_cbSuccess, _cbFailure), addr(_addr)
-        {
-            //
-        }
+        ReverseWork(Dynamic _cbSuccess, Dynamic _cbFailure, sockaddr_in _addr)
+            : CallbackWorkRequest(_cbSuccess, _cbFailure)
+            , addr(_addr) {}
 
         void run(uv_loop_t* loop) override
         {
-            auto request = std::make_unique<ReverseRequest>(cbSuccess.rooted, cbFailure.rooted);
+            auto request = std::make_unique<ReverseRequest>(callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted);
             auto result = uv_getnameinfo(loop, &request->uv, ReverseRequest::callback, reinterpret_cast<sockaddr*>(&addr), 0);
             if (result < 0)
             {
-                Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+                callbacks->fail(hx::asys::libuv::uv_err_to_enum(result));
             }
             else
             {
@@ -174,23 +173,22 @@ void hx::asys::net::dns::reverse(Context ctx, const Ipv4Address ip, Dynamic cbSu
 
 void hx::asys::net::dns::reverse(Context ctx, const Ipv6Address ip, Dynamic cbSuccess, Dynamic cbFailure)
 {
-    class ReverseWork final : public hx::asys::libuv::WorkRequest
+    class ReverseWork final : public hx::asys::libuv::CallbackWorkRequest
     {
         sockaddr_in6 addr;
 
     public:
-        ReverseWork(Dynamic _cbSuccess, Dynamic _cbFailure, sockaddr_in6 _addr) : WorkRequest(_cbSuccess, _cbFailure), addr(_addr)
-        {
-            //
-        }
+        ReverseWork(Dynamic _cbSuccess, Dynamic _cbFailure, sockaddr_in6 _addr)
+            : CallbackWorkRequest(_cbSuccess, _cbFailure)
+            , addr(_addr) {}
 
         void run(uv_loop_t* loop) override
         {
-            auto request = std::make_unique<ReverseRequest>(cbSuccess.rooted, cbFailure.rooted);
+            auto request = std::make_unique<ReverseRequest>(callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted);
             auto result = uv_getnameinfo(loop, &request->uv, ReverseRequest::callback, reinterpret_cast<sockaddr*>(&addr), 0);
             if (result < 0)
             {
-                Dynamic(cbFailure.rooted)(hx::asys::libuv::uv_err_to_enum(result));
+                callbacks->fail(hx::asys::libuv::uv_err_to_enum(result));
             }
             else
             {

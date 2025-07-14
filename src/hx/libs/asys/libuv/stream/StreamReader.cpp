@@ -60,7 +60,7 @@ hx::asys::libuv::stream::StreamReader_obj::StreamReader_obj(Ctx& _ctx)
 
 void hx::asys::libuv::stream::StreamReader_obj::read(Array<uint8_t> output, int offset, int length, Dynamic cbSuccess, Dynamic cbFailure)
 {
-    class ReadWork final : public hx::asys::libuv::WorkRequest
+    class ReadWork final : public hx::asys::libuv::CallbackWorkRequest
     {
         Ctx& ctx;
         const hx::RootedObject<Array_obj<uint8_t>> array;
@@ -69,7 +69,7 @@ void hx::asys::libuv::stream::StreamReader_obj::read(Array<uint8_t> output, int 
 
     public:
         ReadWork(Dynamic _cbSuccess, Dynamic _cbFailure, Ctx& _ctx, Array<uint8_t> _output, int _offset, int _length)
-            : WorkRequest(_cbSuccess, _cbFailure)
+            : CallbackWorkRequest(_cbSuccess, _cbFailure)
             , ctx(_ctx)
             , array(_output.mPtr)
             , offset(_offset)
@@ -83,7 +83,7 @@ void hx::asys::libuv::stream::StreamReader_obj::read(Array<uint8_t> output, int 
             {
                 if (!ctx.buffer.empty())
                 {
-                    ctx.queue.emplace_back(array.rooted, offset, length, cbSuccess.rooted, cbFailure.rooted);
+                    ctx.queue.emplace_back(array.rooted, offset, length, callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted);
                     ctx.consume();
 
                     return;
@@ -92,13 +92,13 @@ void hx::asys::libuv::stream::StreamReader_obj::read(Array<uint8_t> output, int 
                 auto result = uv_read_start(ctx.stream, ctx.cbAlloc, ctx.cbRead);
                 if (result < 0 && result != UV_EALREADY)
                 {
-                    Dynamic(cbFailure.rooted)(uv_err_to_enum(result));
+                    callbacks->fail(uv_err_to_enum(result));
 
                     return;
                 }
             }
 
-            ctx.queue.emplace_back(array.rooted, offset, length, cbSuccess.rooted, cbFailure.rooted);
+            ctx.queue.emplace_back(array.rooted, offset, length, callbacks->cbSuccess.rooted, callbacks->cbFailure.rooted);
         }
     };
 

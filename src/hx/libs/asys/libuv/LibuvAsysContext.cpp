@@ -107,3 +107,7 @@ void hx::asys::libuv::LibuvAsysContext_obj::Ctx::consume(uv_async_t* async)
 hx::asys::libuv::LibuvAsysContext_obj::LibuvAsysContext_obj(/*, hx::asys::system::CurrentProcess _process */)
     // : hx::asys::Context_obj()
     : ctx(new Ctx()) {}
+
+hx::asys::libuv::RootedCallbacks::RootedCallbacks(Dynamic _cbSuccess, Dynamic _cbFailure)
+    : cbSuccess(_cbSuccess.mPtr)
+    , cbFailure(_cbFailure.mPtr) {}
