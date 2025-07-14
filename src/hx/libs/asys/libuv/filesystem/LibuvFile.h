@@ -11,6 +11,8 @@ namespace hx::asys::libuv::filesystem
         uv_loop_t* loop;
         std::atomic_bool closed;
 
+        static void finalise(Dynamic obj);
+
     public:
         uv_file file;
 

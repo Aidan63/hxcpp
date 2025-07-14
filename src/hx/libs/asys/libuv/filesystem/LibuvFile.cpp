@@ -98,21 +98,6 @@ namespace
             spRequest->callbacks->succeed(statBuf);
         }
     }
-
-    void onFinalise(Dynamic obj)
-    {
-        //class FinaliseWork : public hx::asys::libuv::WorkRequest
-        //{
-        //public:
-        //    void run(uv_loop_t* loop) override
-        //    {
-        //        //
-        //    }
-        //};
-
-        //auto file = reinterpret_cast<hx::asys::libuv::filesystem::LibuvFile_obj*>(obj.mPtr);
-        //auto ctx  = static_cast<hx::asys::libuv::LibuvAsysContext_obj::Ctx*>();
-    }
 }
 
 void hx::asys::filesystem::File_obj::open(Context ctx, String path, int flags, Dynamic cbSuccess, Dynamic cbFailure)
@@ -264,13 +249,35 @@ void hx::asys::filesystem::File_obj::info(Context ctx, String path, Dynamic cbSu
     libuvCtx->ctx->emplace<InfoWork>(cbSuccess, cbFailure, std::move(pathBuffer), pathString);
 }
 
+void hx::asys::libuv::filesystem::LibuvFile_obj::finalise(Dynamic obj)
+{
+    class FinaliseWork : public hx::asys::libuv::WorkRequest
+    {
+        uv_file fd;
+    public:
+        FinaliseWork(uv_file _fd) : fd(_fd) {}
+
+        void run(uv_loop_t* loop) override
+        {
+            auto request = new uv_fs_t();
+
+            uv_fs_close(loop, request, fd, [](uv_fs_t* request) { delete request; });
+        }
+    };
+
+    auto file = reinterpret_cast<hx::asys::libuv::filesystem::LibuvFile_obj*>(obj.mPtr);
+    auto ctx  = static_cast<hx::asys::libuv::LibuvAsysContext_obj::Ctx*>(file->loop->data);
+
+    ctx->emplace<FinaliseWork>(file->file);
+}
+
 hx::asys::libuv::filesystem::LibuvFile_obj::LibuvFile_obj(uv_loop_t* _loop, uv_file _file, const String _path)
     : File_obj(_path)
     , loop(_loop)
     , closed(false)
     , file(_file)
 {
-    _hx_set_finalizer(this, onFinalise);
+    _hx_set_finalizer(this, LibuvFile_obj::finalise);
 }
 
 void hx::asys::libuv::filesystem::LibuvFile_obj::write(::cpp::Int64 pos, Array<uint8_t> data, int offset, int length, Dynamic cbSuccess, Dynamic cbFailure)
