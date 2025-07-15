@@ -67,7 +67,6 @@ namespace hx::asys::libuv
             uv_loop_t loop;
             uv_async_t serialised;
             std::array<uv_tty_t, 3> ttys;
-            //hx::asys::libuv::stream::StreamReader_obj::Ctx reader;
             std::thread thread;
             std::mutex lock;
             std::deque<std::unique_ptr<WorkRequest>> queue;

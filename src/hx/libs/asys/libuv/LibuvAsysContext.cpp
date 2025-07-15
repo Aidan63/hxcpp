@@ -1,7 +1,7 @@
 #include <hxcpp.h>
 #include <hx/asys/libuv/LibuvAsysContext.h>
 #include "BaseData.h"
-//#include "system/LibuvCurrentProcess.h"
+#include "system/LibuvCurrentProcess.h"
 
 #include <memory>
 #include <thread>
@@ -28,7 +28,6 @@ hx::asys::libuv::LibuvAsysContext_obj::Ctx::Ctx()
     : loop()
     , serialised()
     , ttys()
-    // , reader(reinterpret_cast<uv_stream_t*>(&ttys.at(0)))
     , lock()
     , queue()
     , thread(&hx::asys::libuv::LibuvAsysContext_obj::Ctx::run, this)
@@ -104,9 +103,15 @@ void hx::asys::libuv::LibuvAsysContext_obj::Ctx::consume(uv_async_t* async)
     }
 }
 
-hx::asys::libuv::LibuvAsysContext_obj::LibuvAsysContext_obj(/*, hx::asys::system::CurrentProcess _process */)
-    // : hx::asys::Context_obj()
-    : ctx(new Ctx()) {}
+hx::asys::libuv::LibuvAsysContext_obj::LibuvAsysContext_obj()
+    : ctx(new Ctx())
+{
+    process =
+        hx::asys::system::CurrentProcess(new hx::asys::libuv::system::LibuvCurrentProcess(
+            new hx::asys::libuv::system::LibuvCurrentProcess::Ctx(reinterpret_cast<uv_stream_t*>(&ctx->ttys.at(0))),
+            reinterpret_cast<uv_stream_t*>(&ctx->ttys.at(1)),
+            reinterpret_cast<uv_stream_t*>(&ctx->ttys.at(2))));
+}
 
 hx::asys::libuv::RootedCallbacks::RootedCallbacks(Dynamic _cbSuccess, Dynamic _cbFailure)
     : cbSuccess(_cbSuccess.mPtr)

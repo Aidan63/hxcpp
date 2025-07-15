@@ -1,6 +1,6 @@
 #include <hxcpp.h>
 #include <string>
-#include "LibuvChildProcess.h"
+//#include "LibuvChildProcess.h"
 #include "../filesystem/LibuvFile.h"
 #include "LibuvCurrentProcess.h"
 
@@ -63,83 +63,80 @@ namespace
 	}
 }
 
-hx::asys::libuv::system::LibuvCurrentProcess::Ctx::Ctx(uv_loop_t* _loop)
-	: loop(_loop)
-	, signals()
-	, ttys()
-	, reader(reinterpret_cast<uv_stream_t*>(ttys.data()))
+hx::asys::libuv::system::LibuvCurrentProcess::Ctx::Ctx(uv_stream_t* _stdin)
+	: reader(_stdin, onAlloc, onRead)
 {
 	reader.stream->data = this;
 }
 
-hx::asys::libuv::system::LibuvCurrentProcess::LibuvCurrentProcess(Ctx* _ctx)
+hx::asys::libuv::system::LibuvCurrentProcess::LibuvCurrentProcess(Ctx* _ctx, uv_stream_t* _stdout, uv_stream_t* _stderr)
 	: CurrentProcess_obj(
-		hx::asys::Readable(new hx::asys::libuv::stream::StreamReader_obj(&_ctx->reader, onAlloc, onRead)),
-		hx::asys::Writable(new hx::asys::libuv::stream::StreamWriter_obj(reinterpret_cast<uv_stream_t*>(&_ctx->ttys.at(1)))),
-		hx::asys::Writable(new hx::asys::libuv::stream::StreamWriter_obj(reinterpret_cast<uv_stream_t*>(&_ctx->ttys.at(2)))))
+		hx::asys::Readable(new hx::asys::libuv::stream::StreamReader_obj(_ctx->reader)),
+		hx::asys::Writable(new hx::asys::libuv::stream::StreamWriter_obj(_stdout)),
+		hx::asys::Writable(new hx::asys::libuv::stream::StreamWriter_obj(_stderr)))
 	, ctx(_ctx) {}
 
 hx::asys::Pid hx::asys::libuv::system::LibuvCurrentProcess::pid()
 {
 	return uv_os_getpid();
 }
-
-void hx::asys::libuv::system::LibuvCurrentProcess::sendSignal(hx::EnumBase signal, Dynamic cbSuccess, Dynamic cbFailure)
-{
-	auto result = 0;
-	auto signalId = getSignalId(signal);
-	if ((result = uv_kill(pid(), signalId)) < 0)
-	{
-		cbFailure(hx::asys::libuv::uv_err_to_enum(result));
-	}
-	else
-	{
-		cbSuccess();
-	}
-}
-
-void hx::asys::libuv::system::LibuvCurrentProcess::setSignalAction(hx::EnumBase signal, hx::EnumBase action)
-{
-	auto signalId = getSignalId(signal);
-	auto actionId = action->_hx_getIndex();
-
-	switch (actionId)
-	{
-	case 0:
-	case 2:
-	{
-		auto& handler = ctx->signals[signalId] = std::make_unique<SignalHandler>(actionId == 0 ? null() : action->_hx_getObject(0));
-
-		auto callback = [](uv_signal_t* handle, int signum) {
-			auto gcZone = hx::AutoGCZone();
-			auto signal = reinterpret_cast<SignalHandler*>(handle->data);
-
-			if (hx::IsNotNull(signal->callback.rooted))
-			{
-				Dynamic(signal->callback.rooted)();
-			}
-		};
-
-		if (uv_signal_init(ctx->loop, handler->signal) < 0)
-		{
-			hx::Throw(HX_CSTRING("Failed to init signal"));
-		}
-
-		if (uv_signal_start(handler->signal, callback, signalId) < 0)
-		{
-			hx::Throw(HX_CSTRING("Failed to start signal"));
-		}
-
-		break;
-	}
-
-	case 1:
-	{
-		ctx->signals.erase(signalId);
-		break;
-	}
-	}
-}
+//
+//void hx::asys::libuv::system::LibuvCurrentProcess::sendSignal(hx::EnumBase signal, Dynamic cbSuccess, Dynamic cbFailure)
+//{
+//	auto result = 0;
+//	auto signalId = getSignalId(signal);
+//	if ((result = uv_kill(pid(), signalId)) < 0)
+//	{
+//		cbFailure(hx::asys::libuv::uv_err_to_enum(result));
+//	}
+//	else
+//	{
+//		cbSuccess();
+//	}
+//}
+//
+//void hx::asys::libuv::system::LibuvCurrentProcess::setSignalAction(hx::EnumBase signal, hx::EnumBase action)
+//{
+//	auto signalId = getSignalId(signal);
+//	auto actionId = action->_hx_getIndex();
+//
+//	switch (actionId)
+//	{
+//	case 0:
+//	case 2:
+//	{
+//		auto& handler = ctx->signals[signalId] = std::make_unique<SignalHandler>(actionId == 0 ? null() : action->_hx_getObject(0));
+//
+//		auto callback = [](uv_signal_t* handle, int signum) {
+//			auto gcZone = hx::AutoGCZone();
+//			auto signal = reinterpret_cast<SignalHandler*>(handle->data);
+//
+//			if (hx::IsNotNull(signal->callback.rooted))
+//			{
+//				Dynamic(signal->callback.rooted)();
+//			}
+//		};
+//
+//		if (uv_signal_init(ctx->loop, handler->signal) < 0)
+//		{
+//			hx::Throw(HX_CSTRING("Failed to init signal"));
+//		}
+//
+//		if (uv_signal_start(handler->signal, callback, signalId) < 0)
+//		{
+//			hx::Throw(HX_CSTRING("Failed to start signal"));
+//		}
+//
+//		break;
+//	}
+//
+//	case 1:
+//	{
+//		ctx->signals.erase(signalId);
+//		break;
+//	}
+//	}
+//}
 
 void hx::asys::libuv::system::LibuvCurrentProcess::__Mark(hx::MarkContext* __inCtx)
 {
@@ -157,17 +154,17 @@ void hx::asys::libuv::system::LibuvCurrentProcess::__Visit(hx::VisitContext* __i
 }
 #endif
 
-hx::asys::libuv::system::LibuvCurrentProcess::SignalHandler::SignalHandler(Dynamic cb)
-	: callback(cb.mPtr)
-	, signal(new uv_signal_t())
-{
-	signal->data = this;
-}
-
-hx::asys::libuv::system::LibuvCurrentProcess::SignalHandler::~SignalHandler()
-{
-	uv_signal_stop(signal);
-	uv_close(reinterpret_cast<uv_handle_t*>(signal), [](uv_handle_t* handle) {
-		delete reinterpret_cast<uv_signal_t*>(handle);
-	});
-}
+//hx::asys::libuv::system::LibuvCurrentProcess::SignalHandler::SignalHandler(Dynamic cb)
+//	: callback(cb.mPtr)
+//	, signal(new uv_signal_t())
+//{
+//	signal->data = this;
+//}
+//
+//hx::asys::libuv::system::LibuvCurrentProcess::SignalHandler::~SignalHandler()
+//{
+//	uv_signal_stop(signal);
+//	uv_close(reinterpret_cast<uv_handle_t*>(signal), [](uv_handle_t* handle) {
+//		delete reinterpret_cast<uv_signal_t*>(handle);
+//	});
+//}
