@@ -8,6 +8,7 @@ namespace
 {
 	void onConnection(uv_stream_t* stream, int status)
 	{
+		auto gcZone = hx::AutoGCZone();
 		auto server = static_cast<hx::asys::libuv::net::LibuvTcpServer::Ctx*>(stream->data);
 
 		if (status < 0)
@@ -18,33 +19,42 @@ namespace
 		}
 		else
 		{
-			auto request = server->connections.tryDequeue();
-			if (nullptr != request)
+			auto callbacks = server->connections.tryDequeue();
+			if (nullptr != callbacks)
 			{
-				auto tcp    = std::make_unique<uv_tcp_t>();
-				auto result = 0;
+				auto ctx = std::make_unique<hx::asys::libuv::net::LibuvTcpSocket::Ctx>();
 
-				if ((result = uv_tcp_init(server->tcp->loop, tcp.get())) < 0)
+				if ((ctx->status = uv_tcp_init(server->tcp->loop, &ctx->tcp)) < 0)
 				{
+					ctx->callbacks = std::move(callbacks);
+					ctx->close();
+
 					return;
 				}
 
-				if ((result = uv_accept(reinterpret_cast<uv_stream_t*>(server->tcp.get()), reinterpret_cast<uv_stream_t*>(tcp.get()))) < 0)
+				if ((ctx->status = uv_accept(reinterpret_cast<uv_stream_t*>(server->tcp.get()), reinterpret_cast<uv_stream_t*>(&ctx->tcp))) < 0)
 				{
+					ctx->callbacks = std::move(callbacks);
+					ctx->close();
+
 					return;
 				}
-
-				auto gcZone = hx::AutoGCZone();
 
 				::hx::Anon local;
-				if ((result = hx::asys::libuv::net::getLocalAddress(tcp.get(), local)) < 0)
+				if ((ctx->status = hx::asys::libuv::net::getLocalAddress(&ctx->tcp, local)) < 0)
 				{
+					ctx->callbacks = std::move(callbacks);
+					ctx->close();
+
 					return;
 				}
 
 				::hx::Anon remote;
-				if ((result = hx::asys::libuv::net::getRemoteAddress(tcp.get(), remote)) < 0)
+				if ((ctx->status = hx::asys::libuv::net::getRemoteAddress(&ctx->tcp, remote)) < 0)
 				{
+					ctx->callbacks = std::move(callbacks);
+					ctx->close();
+
 					return;
 				}
 
@@ -55,7 +65,7 @@ namespace
 					return;
 				}*/
 
-				request->succeed(hx::asys::net::TcpSocket(new hx::asys::libuv::net::LibuvTcpSocket(std::move(tcp), local, remote)));
+				callbacks->succeed(hx::asys::net::TcpSocket(new hx::asys::libuv::net::LibuvTcpSocket(ctx.release(), local, remote)));
 			}
 		}
 	}

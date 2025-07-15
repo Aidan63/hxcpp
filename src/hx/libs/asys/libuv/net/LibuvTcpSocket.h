@@ -12,18 +12,49 @@ namespace hx::asys::libuv::net
 	class LibuvTcpSocket final : public hx::asys::net::TcpSocket_obj
 	{
 	public:
-		struct Ctx
+		class Ctx
 		{
-			std::unique_ptr<uv_tcp_t> tcp;
-			std::atomic_bool closed;
+			static void onCloseCallback(uv_handle_t* handle);
+
+		public:
+			/// <summary>
+			/// 
+			/// </summary>
+			uv_tcp_t tcp;
+
+			/// <summary>
+			/// 
+			/// </summary>
+			uv_shutdown_t shutdown;
+
+			/// <summary>
+			/// 
+			/// </summary>
+			std::unique_ptr<RootedCallbacks> callbacks;
+
+			/// <summary>
+			/// 
+			/// </summary>
 			hx::asys::libuv::stream::StreamReader_obj::Ctx stream;
 
-			Ctx(std::unique_ptr<uv_tcp_t> _tcp, uv_alloc_cb _cbAlloc, uv_read_cb _cbRead);
+			/// <summary>
+			/// 
+			/// </summary>
+			std::atomic_bool closed;
+
+			/// <summary>
+			/// 
+			/// </summary>
+			int status;
+
+			Ctx();
+
+			void close();
 		};
 
 		Ctx* ctx;
 
-		LibuvTcpSocket(std::unique_ptr<uv_tcp_t> _tcp, ::hx::Anon _localAddress, ::hx::Anon _remoteAddress);
+		LibuvTcpSocket(Ctx* _ctx, ::hx::Anon _localAddress, ::hx::Anon _remoteAddress);
 
 		//void getKeepAlive(Dynamic cbSuccess, Dynamic cbFailure) override;
 		//void getSendBufferSize(Dynamic cbSuccess, Dynamic cbFailure) override;
