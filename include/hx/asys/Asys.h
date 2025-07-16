@@ -214,14 +214,14 @@ namespace hx
             class Process_obj : public Object
             {
             public:
-                //static void open(Context ctx, String command, hx::Anon options, Dynamic cbSuccess, Dynamic cbFailure);
+                static void open(Context ctx, String command, hx::Anon options, Dynamic cbSuccess, Dynamic cbFailure);
 
                 virtual Pid pid() = 0;
 
                 //virtual void sendSignal(hx::EnumBase signal, Dynamic cbSuccess, Dynamic cbFailure) = 0;
             };
 
-            /*class ChildProcess_obj : public Process_obj
+            class ChildProcess_obj : public Process_obj
             {
             public:
                 ChildProcess_obj(Writable _stdio_in, Readable _stdio_out, Readable _stdio_err)
@@ -235,7 +235,7 @@ namespace hx
 
                 virtual void exitCode(Dynamic cbSuccess, Dynamic cbFailure) = 0;
                 virtual void close(Dynamic cbSuccess, Dynamic cbFailure) = 0;
-            };*/
+            };
 
             class CurrentProcess_obj : public Process_obj
             {

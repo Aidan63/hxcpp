@@ -160,8 +160,8 @@
         <file name='${this_dir}/stream/StreamWriter.cpp'/>
         <file name='${this_dir}/filesystem/LibuvFile.cpp'/>
         <file name='${this_dir}/filesystem/LibuvDirectory.cpp'/>
-        <!--<file name='${this_dir}/system/LibuvProcess.cpp'/>
-        <file name='${this_dir}/system/LibuvChildProcess.cpp'/>-->
+        <file name='${this_dir}/system/LibuvProcess.cpp'/>
+        <file name='${this_dir}/system/LibuvChildProcess.cpp'/>
         <file name='${this_dir}/system/LibuvCurrentProcess.cpp'/>
     </files>
 
