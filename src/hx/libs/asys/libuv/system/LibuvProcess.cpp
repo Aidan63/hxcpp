@@ -195,16 +195,17 @@ void hx::asys::system::Process_obj::open(Context ctx, String command, hx::Anon o
     process->options.stdio_count = process->containers.size();
     process->options.file        = command.utf8_str();
     process->options.exit_cb     = [](uv_process_t* request, int64_t status, int signal) {
+        auto gcZone  = hx::AutoGCZone();
         auto process = reinterpret_cast<hx::asys::libuv::system::LibuvChildProcess::Ctx*>(request->data);
 
         process->currentExitCode = status;
 
-        auto gcZone   = hx::AutoGCZone();
-        auto callback = Dynamic(process->exitCallback.rooted);
-        if (null() != callback)
+        for (auto&& callbacks : process->exitCallbacks)
         {
-            callback(status);
+            callbacks->succeed(status);
         }
+
+        process->exitCallbacks.clear();
     };
 
 #if HX_WINDOWS

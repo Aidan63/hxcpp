@@ -30,7 +30,7 @@ namespace hx::asys::libuv::system
 			std::array<uv_stdio_container_t, 3> containers;
 			std::array<Stream, 3> streams;
 			std::optional<int64_t> currentExitCode;
-			hx::RootedObject<hx::Object> exitCallback;
+			std::vector<std::unique_ptr<hx::asys::libuv::RootedCallbacks>> exitCallbacks;
 
 			Ctx();
 		};

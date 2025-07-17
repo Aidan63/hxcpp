@@ -48,7 +48,7 @@ hx::asys::libuv::system::LibuvChildProcess::Ctx::Ctx()
 	, containers()
 	, streams()
 	, currentExitCode()
-	, exitCallback(null())
+	, exitCallbacks()
 {
 	request.data = this;
 }
@@ -124,14 +124,33 @@ hx::asys::Pid hx::asys::libuv::system::LibuvChildProcess::pid()
 
 void hx::asys::libuv::system::LibuvChildProcess::exitCode(Dynamic cbSuccess, Dynamic cbFailure)
 {
-	if (ctx->currentExitCode.has_value())
+	class ExitCodeWork : public hx::asys::libuv::CallbackWorkRequest
 	{
-		cbSuccess(static_cast<int>(ctx->currentExitCode.value()));
-	}
-	else
-	{
-		ctx->exitCallback.rooted = cbSuccess.mPtr;
-	}
+		Ctx* ctx;
+
+	public:
+		ExitCodeWork(Dynamic _cbSuccess, Dynamic _cbFailure, Ctx* _ctx)
+			: CallbackWorkRequest(_cbSuccess, _cbFailure)
+			, ctx(_ctx) { }
+
+		void run(uv_loop_t* loop) override
+		{
+			auto gcZone = hx::AutoGCZone();
+
+			if (ctx->currentExitCode.has_value())
+			{
+				callbacks->succeed(static_cast<int>(ctx->currentExitCode.value()));
+			}
+			else
+			{
+				ctx->exitCallbacks.push_back(std::move(callbacks));
+			}
+		}
+	};
+
+	auto libuvCtx = reinterpret_cast<LibuvAsysContext_obj::Ctx*>(ctx->request.loop->data);
+
+	libuvCtx->emplace<ExitCodeWork>(cbSuccess, cbFailure, ctx);
 }
 
 void hx::asys::libuv::system::LibuvChildProcess::close(Dynamic cbSuccess, Dynamic cbFailure)
