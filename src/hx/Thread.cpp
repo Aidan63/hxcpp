@@ -431,6 +431,8 @@ void __hxcpp_tls_set(int inID,Dynamic inVal)
 
 // --- Mutex ------------------------------------------------------------
 
+#if (HXCPP_API_LEVEL<500)
+
 Dynamic __hxcpp_mutex_create()
 {
 	return new hx::thread::RecursiveMutex_obj();
@@ -453,6 +455,8 @@ void __hxcpp_mutex_release(Dynamic inMutex)
 
 	mutex->release();
 }
+
+#endif
 
 #if defined(HX_LINUX) || defined(HX_ANDROID)
 #define POSIX_SEMAPHORE
@@ -586,6 +590,8 @@ void __hxcpp_semaphore_release(Dynamic inSemaphore) {
   semaphore->Release();
 }
 
+#if (HXCPP_API_LEVEL<500)
+
 Dynamic __hxcpp_condition_create(void)
 {
 	return new hx::thread::ConditionVariable_obj();
@@ -630,6 +636,8 @@ void __hxcpp_condition_broadcast(Dynamic inCond)
 
 	condition->broadcast();
 }
+
+#endif
 
 // --- Lock ------------------------------------------------------------
 

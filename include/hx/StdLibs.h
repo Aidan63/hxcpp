@@ -309,16 +309,19 @@ void    __hxcpp_thread_send(Dynamic inThread, Dynamic inMessage);
 Dynamic __hxcpp_thread_read_message(bool inBlocked);
 bool __hxcpp_is_current_thread(hx::Object *inThread);
 
+#if (HXCPP_API_LEVEL<500)
 Dynamic __hxcpp_mutex_create();
 void    __hxcpp_mutex_acquire(Dynamic);
 bool    __hxcpp_mutex_try(Dynamic);
 void    __hxcpp_mutex_release(Dynamic);
+#endif
 
 Dynamic __hxcpp_semaphore_create(int);
 void __hxcpp_semaphore_acquire(Dynamic);
 bool __hxcpp_semaphore_try_acquire(Dynamic, double timeout);
 void __hxcpp_semaphore_release(Dynamic);
 
+#if (HXCPP_API_LEVEL<500)
 Dynamic __hxcpp_condition_create(void);
 void __hxcpp_condition_acquire(Dynamic);
 bool __hxcpp_condition_try_acquire(Dynamic);
@@ -327,6 +330,7 @@ void __hxcpp_condition_wait(Dynamic);
 bool __hxcpp_condition_timed_wait(Dynamic,double);
 void __hxcpp_condition_signal(Dynamic);
 void __hxcpp_condition_broadcast(Dynamic);
+#endif
 
 Dynamic __hxcpp_lock_create();
 bool    __hxcpp_lock_wait(Dynamic inlock,double inTime);
