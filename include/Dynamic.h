@@ -24,6 +24,8 @@ public:
    Dynamic(unsigned short inVal);
    Dynamic(unsigned char inVal);
    Dynamic(signed char inVal);
+   Dynamic(char16_t inVal);
+   Dynamic(char32_t inVal);
    Dynamic(const cpp::CppInt32__ &inVal);
    Dynamic(bool inVal);
    Dynamic(double inVal);
@@ -71,9 +73,12 @@ public:
    inline operator unsigned char () const { return mPtr ? mPtr->__ToInt() : 0; }
    inline operator char () const { return mPtr ? mPtr->__ToInt() : 0; }
    inline operator signed char () const { return mPtr ? mPtr->__ToInt() : 0; }
+   inline operator char16_t () const { return mPtr ? mPtr->__ToInt() : 0; }
+   inline operator char32_t () const { return mPtr ? mPtr->__ToInt() : 0; }
    inline operator bool() const { return mPtr && mPtr->__ToInt(); }
    inline operator cpp::Int64() const { return mPtr ? mPtr->__ToInt64() : 0; }
    inline operator cpp::UInt64() const { return mPtr ? mPtr->__ToInt64() : 0; }
+   inline operator ::hx::Object*() const { return mPtr; }
 
    // Conversion to generic pointer requires you to tag the class with a typedef
    template<typename T>
@@ -171,6 +176,8 @@ public:
       bool operator op (unsigned short inRHS)  const { return IsNumeric() && ((double)(*this) op (double)inRHS); } \
       bool operator op (signed char inRHS)  const { return IsNumeric() && ((double)(*this) op (double)inRHS); } \
       bool operator op (unsigned char inRHS)  const { return IsNumeric() && ((double)(*this) op (double)inRHS); } \
+      bool operator op (char16_t inRHS)  const { return IsNumeric() && ((double)(*this) op (double)inRHS); } \
+      bool operator op (char32_t inRHS)  const { return IsNumeric() && ((double)(*this) op (double)inRHS); } \
       bool operator op (bool inRHS)  const { return IsBool() && ((double)(*this) op (double)inRHS); } \
 
    bool operator != (const String &inRHS)  const { return !mPtr || ((String)(*this) != inRHS); }
@@ -184,6 +191,8 @@ public:
    bool operator != (unsigned short inRHS)  const { return !IsNumeric() || ((double)(*this) != (double)inRHS); }
    bool operator != (signed char inRHS)  const { return !IsNumeric() || ((double)(*this) != (double)inRHS); }
    bool operator != (unsigned char inRHS)  const { return !IsNumeric() || ((double)(*this) != (double)inRHS); }
+   bool operator != (char16_t inRHS)  const { return !IsNumeric() || ((double)(*this) != (double)inRHS); }
+   bool operator != (char32_t inRHS)  const { return !IsNumeric() || ((double)(*this) != (double)inRHS); }
    bool operator != (bool inRHS)  const { return !IsBool() || ((double)(*this) != (double)inRHS); }
 
 
@@ -229,6 +238,8 @@ public:
     Dynamic operator+(const unsigned short &i) const;
     Dynamic operator+(const signed char &i) const;
     Dynamic operator+(const unsigned char &i) const;
+    Dynamic operator+(const char16_t& i) const;
+    Dynamic operator+(const char32_t& i) const;
     Dynamic operator+(const double &d) const;
     Dynamic operator+(const float &d) const;
     Dynamic operator+(const cpp::Variant &d) const;
@@ -270,6 +281,10 @@ public:
         { return mPtr->__GetType()==vtInt ?  Dynamic((int)(*this) op inRHS) : Dynamic((double)(*this) op inRHS); } \
       Dynamic operator op (const unsigned char &inRHS) const \
         { return mPtr->__GetType()==vtInt ?  Dynamic((int)(*this) op inRHS) : Dynamic((double)(*this) op inRHS); } \
+      Dynamic operator op (const char16_t &inRHS) const \
+        { return mPtr->__GetType()==vtInt ?  Dynamic((int)(*this) op inRHS) : Dynamic((double)(*this) op inRHS); } \
+      Dynamic operator op (const char32_t &inRHS) const \
+        { return mPtr->__GetType()==vtInt ?  Dynamic((int)(*this) op inRHS) : Dynamic((double)(*this) op inRHS); } \
       Dynamic operator op (const cpp::Int64 &inRHS) const \
         { return Dynamic((double)(*this) op inRHS); } \
       Dynamic operator op (const cpp::UInt64 &inRHS) const \
@@ -281,19 +296,23 @@ public:
    static void ThrowBadFunctionError();
    inline void CheckFPtr() { if (!mPtr) ThrowBadFunctionError(); }
 
+#if (HXCPP_API_LEVEL>=500)
+   template<class... TArgs>
+   ::Dynamic operator()(const TArgs&... args);
+#else
    inline  ::Dynamic operator()() { CheckFPtr(); return mPtr->__run(); }
-   inline  ::Dynamic operator()(const Dynamic &inArg0) { CheckFPtr(); return mPtr->__run(inArg0); }
-   inline  ::Dynamic operator()(const Dynamic &inArg0,const Dynamic &inArg1) { CheckFPtr(); return mPtr->__run(inArg0,inArg1); }
-   inline  ::Dynamic operator()(const Dynamic &inArg0,const Dynamic &inArg1,const Dynamic &inArg2) { CheckFPtr(); return mPtr->__run(inArg0,inArg1,inArg2); }
-   inline  ::Dynamic operator()(const Dynamic &inArg0,const Dynamic &inArg1,const Dynamic &inArg2,const Dynamic &inArg3) { CheckFPtr(); return mPtr->__run(inArg0,inArg1,inArg2,inArg3); }
-   inline  ::Dynamic operator()(const Dynamic &inArg0,const Dynamic &inArg1,const Dynamic &inArg2,const Dynamic &inArg3,const Dynamic &inArg4) { CheckFPtr(); return mPtr->__run(inArg0,inArg1,inArg2,inArg3,inArg4); }
+   inline  ::Dynamic operator()(const Dynamic& inArg0) { CheckFPtr(); return mPtr->__run(inArg0); }
+   inline  ::Dynamic operator()(const Dynamic& inArg0, const Dynamic& inArg1) { CheckFPtr(); return mPtr->__run(inArg0, inArg1); }
+   inline  ::Dynamic operator()(const Dynamic& inArg0, const Dynamic& inArg1, const Dynamic& inArg2) { CheckFPtr(); return mPtr->__run(inArg0, inArg1, inArg2); }
+   inline  ::Dynamic operator()(const Dynamic& inArg0, const Dynamic& inArg1, const Dynamic& inArg2, const Dynamic& inArg3) { CheckFPtr(); return mPtr->__run(inArg0, inArg1, inArg2, inArg3); }
+   inline  ::Dynamic operator()(const Dynamic& inArg0, const Dynamic& inArg1, const Dynamic& inArg2, const Dynamic& inArg3, const Dynamic& inArg4) { CheckFPtr(); return mPtr->__run(inArg0, inArg1, inArg2, inArg3, inArg4); }
 
    HX_DECLARE_DYNAMIC_FUNCTIONS;
+#endif
 
 
    typedef const Dynamic &D;
 };
-
 
 
 namespace hx
@@ -457,6 +476,8 @@ COMPARE_DYNAMIC_OP( >  )
    inline double operator op (const unsigned short &inLHS,const Dynamic &inRHS) { return inLHS op (double)inRHS; } \
    inline double operator op (const signed char &inLHS,const Dynamic &inRHS) { return inLHS op (double)inRHS; } \
    inline double operator op (const unsigned char &inLHS,const Dynamic &inRHS) { return inLHS op (double)inRHS; } \
+   inline double operator op (const char16_t &inLHS,const Dynamic &inRHS) { return inLHS op (double)inRHS; } \
+   inline double operator op (const char32_t &inLHS,const Dynamic &inRHS) { return inLHS op (double)inRHS; } \
 
 ARITH_DYNAMIC( - )
 ARITH_DYNAMIC( + )

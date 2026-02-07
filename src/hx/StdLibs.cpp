@@ -30,6 +30,7 @@ typedef int64_t __int64;
 #include <stdio.h>
 #include <time.h>
 #include <clocale>
+#include <mutex>
 
 
 #ifdef HX_ANDROID
@@ -283,8 +284,6 @@ void __hxcpp_stdlibs_boot()
    //_setmode(_fileno(stdin), 0x00040000); // _O_U8TEXT
    #endif
 
-   // This is necessary for UTF-8 output to work correctly.
-   setlocale(LC_ALL, "");
    setlocale(LC_NUMERIC, "C");
 
    // I think this does more harm than good.
@@ -742,6 +741,12 @@ struct VarArgFunc : public hx::Object
      HX_OBJ_WB_NEW_MARKED_OBJECT(this)
    }
 
+#if (HXCPP_API_LEVEL>=500)
+   VarArgFunc(::hx::Callable<::Dynamic(::cpp::VirtualArray)>& inFunc) : mRealFunc(inFunc) {
+       HX_OBJ_WB_NEW_MARKED_OBJECT(this)
+   }
+#endif
+
    int __GetType() const { return vtFunction; }
    ::String __ToString() const { return mRealFunc->__ToString() ; }
 
@@ -754,15 +759,22 @@ struct VarArgFunc : public hx::Object
    void *__GetHandle() const { return mRealFunc.GetPtr(); }
    Dynamic __Run(const Array<Dynamic> &inArgs)
    {
-      return mRealFunc->__run(inArgs);
+#if (HXCPP_API_LEVEL>=500)
+       return hx::invoker::invoke(mRealFunc.mPtr, inArgs);
+#else
+       return mRealFunc->__run(inArgs);
+#endif
    }
 
    Dynamic mRealFunc;
 };
 
 }
-
+#if (HXCPP_API_LEVEL>=500)
+Dynamic __hxcpp_create_var_args(::hx::Callable<::Dynamic(::cpp::VirtualArray)>& inArrayFunc)
+#else
 Dynamic __hxcpp_create_var_args(Dynamic &inArrayFunc)
+#endif
 {
    return Dynamic(new hx::VarArgFunc(inArrayFunc));
 }
@@ -774,7 +786,7 @@ Dynamic __hxcpp_create_var_args(Dynamic &inArrayFunc)
 
 
 
-static HxMutex sgFieldMapMutex;
+static std::mutex sgFieldMapMutex;
 
 typedef std::map<std::string,int> StringToField;
 
@@ -798,7 +810,7 @@ const String &__hxcpp_field_from_id( int f )
 
 int  __hxcpp_field_to_id( const char *inFieldName )
 {
-   AutoLock lock(sgFieldMapMutex);
+   std::lock_guard<std::mutex> lock(sgFieldMapMutex);
 
    if (!sgFieldToStringAlloc)
    {
