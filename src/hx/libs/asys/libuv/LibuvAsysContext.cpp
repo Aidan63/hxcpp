@@ -6,22 +6,14 @@
 #include <memory>
 #include <thread>
 
-namespace
-{
-    static std::atomic<::hx::asys::libuv::LibuvAsysContext_obj*> global = nullptr;
-    static std::latch latch(1);
-}
-
-void hx::asys::Context_obj::boot()
-{
-    global.store(new (::hx::NewObjectType::NewObjConst) ::hx::asys::libuv::LibuvAsysContext_obj());
-
-    latch.wait();
-}
 
 hx::asys::Context hx::asys::Context_obj::get()
 {
-    return ::hx::asys::libuv::LibuvAsysContext(global.load());
+    auto obj = ::hx::asys::libuv::LibuvAsysContext(new ::hx::asys::libuv::LibuvAsysContext_obj());
+
+    obj->ctx->latch.wait();
+
+    return obj;
 }
 
 hx::asys::libuv::LibuvAsysContext_obj::Ctx::Ctx()
@@ -30,6 +22,7 @@ hx::asys::libuv::LibuvAsysContext_obj::Ctx::Ctx()
     , ttys()
     , lock()
     , queue()
+    , latch(1)
     , thread(&hx::asys::libuv::LibuvAsysContext_obj::Ctx::run, this)
 {
     loop.data = this;

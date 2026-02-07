@@ -129,8 +129,7 @@ namespace
                 }
             };
 
-            auto ctx   = static_cast<hx::asys::libuv::LibuvAsysContext_obj::Ctx*>(loop->data);
-            auto guard = std::lock_guard(ctx->lock);
+            auto ctx = static_cast<hx::asys::libuv::LibuvAsysContext_obj::Ctx*>(loop->data);
 
             ctx->emplace<NextWork>(cbSuccess.mPtr, cbFailure.mPtr, dir, batch);
         }
@@ -170,8 +169,7 @@ namespace
                 return;
             }
 
-            auto ctx   = static_cast<hx::asys::libuv::LibuvAsysContext_obj::Ctx*>(loop->data);
-            auto guard = std::lock_guard(ctx->lock);
+            auto ctx = static_cast<hx::asys::libuv::LibuvAsysContext_obj::Ctx*>(loop->data);
 
             ctx->emplace<CloseWork>(cbSuccess.mPtr, cbFailure.mPtr, dir);
         }
@@ -236,7 +234,6 @@ void hx::asys::filesystem::Directory_obj::open(Context ctx, String path, Dynamic
     auto libuvCtx   = hx::asys::libuv::context(ctx);
     auto pathBuffer = std::make_unique<hx::strbuf>();
     auto pathString = path.utf8_str(pathBuffer.get());
-    auto guard      = std::lock_guard(libuvCtx->ctx->lock);
 
     libuvCtx->ctx->emplace<OpenWork>(cbSuccess, cbFailure, std::move(pathBuffer), pathString);
 }
@@ -286,7 +283,6 @@ void hx::asys::filesystem::Directory_obj::create(Context ctx, String path, int p
     auto libuvCtx   = hx::asys::libuv::context(ctx);
     auto pathBuffer = std::make_unique<hx::strbuf>();
     auto pathString = path.utf8_str(pathBuffer.get());
-    auto guard      = std::lock_guard(libuvCtx->ctx->lock);
 
     libuvCtx->ctx->emplace<CreateWork>(cbSuccess, cbFailure, std::move(pathBuffer), pathString, permissions);
 }
@@ -341,7 +337,6 @@ void hx::asys::filesystem::Directory_obj::rename(Context ctx, String oldPath, St
     auto newPathBuffer = std::make_unique<hx::strbuf>();
     auto oldPathString = oldPath.utf8_str(oldPathBuffer.get());
     auto newPathString = newPath.utf8_str(newPathBuffer.get());
-    auto guard         = std::lock_guard(libuvCtx->ctx->lock);
 
     libuvCtx->ctx->emplace<RenameWork>(cbSuccess, cbFailure, std::move(oldPathBuffer), std::move(newPathBuffer), oldPathString, newPathString);
 }
@@ -428,8 +423,6 @@ void hx::asys::filesystem::Directory_obj::check(Context ctx, String path, FileAc
         mode |= R_OK;
     }
 
-    auto guard = std::lock_guard(libuvCtx->ctx->lock);
-
     libuvCtx->ctx->emplace<CheckWork>(cbSuccess, cbFailure, std::move(pathBuffer), pathString, mode);
 }
 
@@ -476,7 +469,6 @@ void hx::asys::filesystem::Directory_obj::deleteFile(Context ctx, String path, D
     auto libuvCtx   = hx::asys::libuv::context(ctx);
     auto pathBuffer = std::make_unique<hx::strbuf>();
     auto pathString = path.utf8_str(pathBuffer.get());
-    auto guard      = std::lock_guard(libuvCtx->ctx->lock);
 
     libuvCtx->ctx->emplace<DeleteFileWork>(cbSuccess, cbFailure, std::move(pathBuffer), pathString);
 }
@@ -525,7 +517,6 @@ void hx::asys::filesystem::Directory_obj::deleteDirectory(Context ctx, String pa
     auto libuvCtx   = hx::asys::libuv::context(ctx);
     auto pathBuffer = std::make_unique<hx::strbuf>();
     auto pathString = path.utf8_str(pathBuffer.get());
-    auto guard      = std::lock_guard(libuvCtx->ctx->lock);
 
     libuvCtx->ctx->emplace<DeleteDirectoryWork>(cbSuccess, cbFailure, std::move(pathBuffer), pathString);
 }
@@ -575,7 +566,6 @@ void hx::asys::filesystem::Directory_obj::isDirectory(Context ctx, String path, 
     auto libuvCtx   = hx::asys::libuv::context(ctx);
     auto pathBuffer = std::make_unique<hx::strbuf>();
     auto pathString = path.utf8_str(pathBuffer.get());
-    auto guard      = std::lock_guard(libuvCtx->ctx->lock);
 
     libuvCtx->ctx->emplace<Work>(cbSuccess, cbFailure, std::move(pathBuffer), pathString);
 }
@@ -625,7 +615,6 @@ void hx::asys::filesystem::Directory_obj::isFile(Context ctx, String path, Dynam
     auto libuvCtx   = hx::asys::libuv::context(ctx);
     auto pathBuffer = std::make_unique<hx::strbuf>();
     auto pathString = path.utf8_str(pathBuffer.get());
-    auto guard      = std::lock_guard(libuvCtx->ctx->lock);
 
     libuvCtx->ctx->emplace<Work>(cbSuccess, cbFailure, std::move(pathBuffer), pathString);
 }
@@ -675,7 +664,6 @@ void hx::asys::filesystem::Directory_obj::isLink(Context ctx, String path, Dynam
     auto libuvCtx   = hx::asys::libuv::context(ctx);
     auto pathBuffer = std::make_unique<hx::strbuf>();
     auto pathString = path.utf8_str(pathBuffer.get());
-    auto guard      = std::lock_guard(libuvCtx->ctx->lock);
 
     libuvCtx->ctx->emplace<Work>(cbSuccess, cbFailure, std::move(pathBuffer), pathString);
 }
@@ -726,7 +714,6 @@ void hx::asys::filesystem::Directory_obj::setLinkOwner(Context ctx, String path,
     auto libuvCtx   = hx::asys::libuv::context(ctx);
     auto pathBuffer = std::make_unique<hx::strbuf>();
     auto pathString = path.utf8_str(pathBuffer.get());
-    auto guard      = std::lock_guard(libuvCtx->ctx->lock);
 
     libuvCtx->ctx->emplace<SetLinkOwnerWork>(cbSuccess, cbFailure, std::move(pathBuffer), pathString, user, group);
 }
@@ -785,7 +772,6 @@ void hx::asys::filesystem::Directory_obj::link(Context ctx, String target, Strin
     auto pathBuffer   = std::make_unique<hx::strbuf>();
     auto targetString = path.utf8_str(targetBuffer.get());
     auto pathString   = path.utf8_str(pathBuffer.get());
-    auto guard        = std::lock_guard(libuvCtx->ctx->lock);
 
     libuvCtx->ctx->emplace<LinkWork>(cbSuccess, cbFailure, std::move(targetBuffer), std::move(pathBuffer), targetString, pathString, type);
 }
@@ -864,7 +850,6 @@ void hx::asys::filesystem::Directory_obj::linkInfo(Context ctx, String path, Dyn
     auto libuvCtx   = hx::asys::libuv::context(ctx);
     auto pathBuffer = std::make_unique<hx::strbuf>();
     auto pathString = path.utf8_str(pathBuffer.get());
-    auto guard      = std::lock_guard(libuvCtx->ctx->lock);
 
     libuvCtx->ctx->emplace<LinkInfoWork>(cbSuccess, cbFailure, std::move(pathBuffer), pathString);
 }
@@ -913,7 +898,6 @@ void hx::asys::filesystem::Directory_obj::readLink(Context ctx, String path, Dyn
     auto libuvCtx   = hx::asys::libuv::context(ctx);
     auto pathBuffer = std::make_unique<hx::strbuf>();
     auto pathString = path.utf8_str(pathBuffer.get());
-    auto guard      = std::lock_guard(libuvCtx->ctx->lock);
 
     libuvCtx->ctx->emplace<ReadLinkWork>(cbSuccess, cbFailure, std::move(pathBuffer), pathString);
 }
@@ -968,7 +952,6 @@ void hx::asys::filesystem::Directory_obj::copyFile(Context ctx, String source, S
     auto dstPathBuffer = std::make_unique<hx::strbuf>();
     auto srcPathString = source.utf8_str(srcPathBuffer.get());
     auto dstPathString = destination.utf8_str(dstPathBuffer.get());
-    auto guard         = std::lock_guard(libuvCtx->ctx->lock);
 
     libuvCtx->ctx->emplace<CopyFileWork>(cbSuccess, cbFailure, std::move(srcPathBuffer), std::move(dstPathBuffer), srcPathString, dstPathString);
 }
@@ -1015,7 +998,6 @@ void hx::asys::filesystem::Directory_obj::realPath(Context ctx, String path, Dyn
     auto libuvCtx   = hx::asys::libuv::context(ctx);
     auto pathBuffer = std::make_unique<hx::strbuf>();
     auto pathString = path.utf8_str(pathBuffer.get());
-    auto guard      = std::lock_guard(libuvCtx->ctx->lock);
 
     libuvCtx->ctx->emplace<RealPathWork>(cbSuccess, cbFailure, std::move(pathBuffer), pathString);
 }

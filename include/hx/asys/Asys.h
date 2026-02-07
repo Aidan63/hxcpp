@@ -29,7 +29,6 @@ namespace hx
             Context_obj() /*: process(_process)*/ {}
 
         public:
-            static void boot();
             static Context get();
 
             system::CurrentProcess process;

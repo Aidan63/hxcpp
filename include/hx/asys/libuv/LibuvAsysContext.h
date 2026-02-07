@@ -70,6 +70,7 @@ namespace hx::asys::libuv
             std::thread thread;
             std::mutex lock;
             std::deque<std::unique_ptr<WorkRequest>> queue;
+            std::latch latch;
 
             Ctx();
 
