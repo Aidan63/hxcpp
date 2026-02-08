@@ -301,16 +301,16 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::write(::cpp::Int64 pos, Array<u
 
     class WriteWork final : public hx::asys::libuv::CallbackWorkRequest
     {
-        std::unique_ptr<hx::ArrayPin> pin;
+        hx::RootedObject<Array_obj<uint8_t>> array;
         const uv_file file;
         const int64_t pos;
         const int offset;
         const int length;
 
     public:
-        WriteWork(Dynamic _cbSuccess, Dynamic _cbFailure, hx::ArrayPin* _pin, uv_file _file, int64_t _pos, int _offset, int _length)
+        WriteWork(Dynamic _cbSuccess, Dynamic _cbFailure, Array<uint8_t> _array, uv_file _file, int64_t _pos, int _offset, int _length)
             : CallbackWorkRequest(_cbSuccess, _cbFailure)
-            , pin(_pin)
+            , array(_array.GetPtr())
             , file(_file)
             , pos(_pos)
             , offset(_offset)
@@ -319,6 +319,7 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::write(::cpp::Int64 pos, Array<u
         void run(uv_loop_t* loop) override
         {
             auto gcZone  = hx::AutoGCZone();
+            auto pin     = std::unique_ptr<hx::ArrayPin>{ array.rooted->Pin() };
             auto request = std::make_unique<WriteRequest>(std::move(callbacks), std::move(pin), offset, length);
             auto result  = uv_fs_write(loop, &request->uv, file, &request->buffer, 1, pos, FsRequest::callback);
             if (result < 0)
@@ -334,7 +335,7 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::write(::cpp::Int64 pos, Array<u
 
     auto ctx = static_cast<LibuvAsysContext_obj::Ctx*>(loop->data);
 
-    ctx->emplace<WriteWork>(cbSuccess, cbFailure, data->Pin(), file, pos, offset, length);
+    ctx->emplace<WriteWork>(cbSuccess, cbFailure, data, file, pos, offset, length);
 }
 
 void hx::asys::libuv::filesystem::LibuvFile_obj::read(::cpp::Int64 pos, Array<uint8_t> output, int offset, int length, Dynamic cbSuccess, Dynamic cbFailure)
@@ -358,16 +359,16 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::read(::cpp::Int64 pos, Array<ui
 
     class ReadWork final : public hx::asys::libuv::CallbackWorkRequest
     {
-        std::unique_ptr<hx::ArrayPin> pin;
+        hx::RootedObject<Array_obj<uint8_t>> array;
         const uv_file file;
         const int64_t pos;
         const int offset;
         const int length;
 
     public:
-        ReadWork(Dynamic _cbSuccess, Dynamic _cbFailure, hx::ArrayPin* _pin, uv_file _file, int64_t _pos, int _offset, int _length)
+        ReadWork(Dynamic _cbSuccess, Dynamic _cbFailure, Array<uint8_t> _array, uv_file _file, int64_t _pos, int _offset, int _length)
             : CallbackWorkRequest(_cbSuccess, _cbFailure)
-            , pin(_pin)
+            , array(_array.GetPtr())
             , file(_file)
             , pos(_pos)
             , offset(_offset)
@@ -376,6 +377,7 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::read(::cpp::Int64 pos, Array<ui
         void run(uv_loop_t* loop) override
         {
             auto gcZone  = hx::AutoGCZone();
+            auto pin     = std::unique_ptr<hx::ArrayPin>{ array.rooted->Pin() };
             auto request = std::make_unique<ReadRequest>(std::move(callbacks), std::move(pin), offset, length);
             auto result  = uv_fs_read(loop, &request->uv, file, &request->buffer, 1, pos, FsRequest::callback);
             if (result < 0)
@@ -391,7 +393,7 @@ void hx::asys::libuv::filesystem::LibuvFile_obj::read(::cpp::Int64 pos, Array<ui
 
     auto ctx = static_cast<LibuvAsysContext_obj::Ctx*>(loop->data);
 
-    ctx->emplace<ReadWork>(cbSuccess, cbFailure, output->Pin(), file, pos, offset, length);
+    ctx->emplace<ReadWork>(cbSuccess, cbFailure, output, file, pos, offset, length);
 }
 
 void hx::asys::libuv::filesystem::LibuvFile_obj::info(Dynamic cbSuccess, Dynamic cbFailure)
