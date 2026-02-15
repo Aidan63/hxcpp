@@ -18,7 +18,5 @@ namespace hx::asys::libuv
 	public:
 		CallbackWorkRequest(Dynamic _cbSuccess, Dynamic _cbFailure)
 			: callbacks(std::make_unique<RootedCallbacks>(_cbSuccess.GetPtr(), _cbFailure.GetPtr())) {}
-
-		virtual ~CallbackWorkRequest() = default;
 	};
 }
