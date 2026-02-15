@@ -3,6 +3,7 @@
 #include "LibuvChildProcess.h"
 #include "LibuvCurrentProcess.h"
 #include "../filesystem/LibuvFile.h"
+#include "../utils/CallbackWorkRequest.hpp"
 
 namespace
 {

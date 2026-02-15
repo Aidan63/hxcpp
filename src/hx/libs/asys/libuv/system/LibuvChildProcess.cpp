@@ -4,6 +4,7 @@
 #include <array>
 #include <memory>
 #include "LibuvChildProcess.h"
+#include "../utils/CallbackWorkRequest.hpp"
 
 namespace
 {

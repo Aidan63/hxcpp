@@ -3,6 +3,8 @@
 #include <memory>
 #include "../LibuvUtils.h"
 #include "NetUtils.h"
+#include "../utils/BaseRequest.hpp"
+#include "../utils/CallbackWorkRequest.hpp"
 
 namespace
 {

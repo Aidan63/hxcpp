@@ -4,6 +4,8 @@
 #include <functional>
 #include <array>
 #include "FsRequest.h"
+#include "../utils/BaseRequest.hpp"
+#include "../utils/CallbackWorkRequest.hpp"
 
 namespace
 {

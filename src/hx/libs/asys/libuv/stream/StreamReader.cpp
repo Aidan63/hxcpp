@@ -1,5 +1,6 @@
 #include <hxcpp.h>
 #include "StreamReader.h"
+#include "../utils/CallbackWorkRequest.hpp"
 
 hx::asys::libuv::stream::StreamReader_obj::Ctx::Ctx(uv_stream_t* _stream, uv_alloc_cb _cbAlloc, uv_read_cb _cbRead)
     : stream(_stream)

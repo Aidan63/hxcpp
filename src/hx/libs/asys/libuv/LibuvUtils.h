@@ -3,7 +3,7 @@
 #include <hxcpp.h>
 #include <uv.h>
 #include <memory>
-#include <hx/asys/libuv/LibuvAsysContext.h>
+#include "LibuvAsysContext.h"
 
 namespace hx::asys::libuv
 {

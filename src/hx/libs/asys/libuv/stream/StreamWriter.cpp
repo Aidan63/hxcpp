@@ -1,6 +1,8 @@
 #include <hxcpp.h>
 #include "StreamWriter.h"
 #include <cstring>
+#include "../utils/BaseRequest.hpp"
+#include "../utils/CallbackWorkRequest.hpp"
 
 namespace
 {

@@ -3,6 +3,8 @@
 #include "LibuvTcpSocket.h"
 #include "NetUtils.h"
 #include "../LibuvUtils.h"
+#include "../utils/BaseRequest.hpp"
+#include "../utils/CallbackWorkRequest.hpp"
 
 namespace
 {

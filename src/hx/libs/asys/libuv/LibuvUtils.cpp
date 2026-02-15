@@ -1,6 +1,7 @@
 #include <hxcpp.h>
 #include <array>
 #include "LibuvUtils.h"
+#include "utils/BaseRequest.hpp"
 
 namespace
 {
@@ -73,9 +74,6 @@ hx::EnumBase hx::asys::libuv::uv_err_to_enum(const int code)
             return create(HX_CSTRING("CustomError"), 14, 1)->_hx_init(0, String::create(uv_err_name(code)));
     }
 }
-
-hx::asys::libuv::BaseRequest::BaseRequest(std::unique_ptr<hx::asys::libuv::RootedCallbacks> _callbacks)
-    : callbacks(std::move(_callbacks)) {}
 
 void hx::asys::libuv::basic_callback(uv_fs_t* request)
 {

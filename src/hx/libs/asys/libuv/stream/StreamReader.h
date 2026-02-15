@@ -4,6 +4,7 @@
 #include <deque>
 #include <array>
 #include "../LibuvUtils.h"
+#include "../utils/BaseRequest.hpp"
 
 HX_DECLARE_CLASS4(hx, asys, libuv, stream, StreamReader)
 

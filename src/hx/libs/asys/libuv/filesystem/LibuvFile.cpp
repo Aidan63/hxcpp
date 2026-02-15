@@ -5,6 +5,7 @@
 #include <limits>
 #include "LibuvFile.h"
 #include "FsRequest.h"
+#include "../utils/CallbackWorkRequest.hpp"
 
 namespace
 {

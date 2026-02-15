@@ -1,7 +1,7 @@
 #pragma once
 
 #include <hxcpp.h>
-#include <hx/asys/libuv/LibuvAsysContext.h>
+#include "../LibuvAsysContext.h"
 #include <atomic>
 
 namespace hx::asys::libuv::filesystem

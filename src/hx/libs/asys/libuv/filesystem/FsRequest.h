@@ -2,6 +2,7 @@
 
 #include <hxcpp.h>
 #include "../LibuvUtils.h"
+#include "../utils/BaseRequest.hpp"
 
 namespace hx::asys::libuv::filesystem
 {

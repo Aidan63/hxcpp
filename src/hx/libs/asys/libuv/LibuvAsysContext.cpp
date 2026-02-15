@@ -1,5 +1,5 @@
 #include <hxcpp.h>
-#include <hx/asys/libuv/LibuvAsysContext.h>
+#include "LibuvAsysContext.h"
 #include "BaseData.h"
 #include "system/LibuvCurrentProcess.h"
 
@@ -105,7 +105,3 @@ hx::asys::libuv::LibuvAsysContext_obj::LibuvAsysContext_obj()
             reinterpret_cast<uv_stream_t*>(&ctx->ttys.at(1)),
             reinterpret_cast<uv_stream_t*>(&ctx->ttys.at(2))));
 }
-
-hx::asys::libuv::RootedCallbacks::RootedCallbacks(Dynamic _cbSuccess, Dynamic _cbFailure)
-    : cbSuccess(_cbSuccess.mPtr)
-    , cbFailure(_cbFailure.mPtr) {}
