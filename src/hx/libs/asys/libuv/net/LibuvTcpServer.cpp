@@ -373,7 +373,7 @@ void hx::asys::net::TcpServer_obj::open_ipv4(Context ctx, const String host, int
 				return;
 			}
 
-			callbacks->succeed(new hx::asys::libuv::net::LibuvTcpServer(new hx::asys::libuv::net::LibuvTcpServer::Ctx(std::move(tcp)), local));
+			callbacks->succeed(hx::asys::net::TcpServer(new hx::asys::libuv::net::LibuvTcpServer(new hx::asys::libuv::net::LibuvTcpServer::Ctx(std::move(tcp)), local)));
 		}
 	};
 

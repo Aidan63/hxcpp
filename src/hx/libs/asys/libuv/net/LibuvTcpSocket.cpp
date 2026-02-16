@@ -52,7 +52,7 @@ namespace
 				return;
 			}
 
-			request->callbacks->succeed(new hx::asys::libuv::net::LibuvTcpSocket(request->ctx.release(), local, remote));
+			request->callbacks->succeed(hx::asys::net::TcpSocket(new hx::asys::libuv::net::LibuvTcpSocket(request->ctx.release(), local, remote)));
 		}
 	};
 
@@ -327,7 +327,7 @@ void hx::asys::net::TcpSocket_obj::connect_ipv4(Context ctx, const String host, 
 		}
 	};
 
-	auto keepAlive = std::optional<int>();
+	auto keepAlive  = std::optional<int>();
 	auto sendBuffer = std::optional<int>();
 	auto recvBuffer = std::optional<int>();
 
