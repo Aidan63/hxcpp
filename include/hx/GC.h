@@ -168,7 +168,7 @@ extern size_t sgMinimumFreeSpace;
 extern size_t sgTargetFreeSpacePercentage;
 
 
-extern HXCPP_EXTERN_CLASS_ATTRIBUTES int gByteMarkID;
+extern HXCPP_EXTERN_CLASS_ATTRIBUTES unsigned char gByteMarkID;
 
 // Call in response to a gPauseForCollect. Normally, this is done for you in "new"
 void PauseForCollect();
@@ -249,8 +249,8 @@ inline void MarkAlloc(void *inPtr ,hx::MarkContext *__inCtx);
 inline void MarkObjectAlloc(hx::Object *inPtr ,hx::MarkContext *__inCtx);
 
 // Implemented differently for efficiency
-void MarkObjectArray(hx::Object **inPtr, int inLength, hx::MarkContext *__inCtx);
-void MarkStringArray(String *inPtr, int inLength, hx::MarkContext *__inCtx);
+void MarkObjectArray(hx::Object **inPtr, size_t inLength, hx::MarkContext *__inCtx);
+void MarkStringArray(String *inPtr, size_t inLength, hx::MarkContext *__inCtx);
 
 // Provide extra debug info to the marking routines
 #ifdef HXCPP_DEBUG
