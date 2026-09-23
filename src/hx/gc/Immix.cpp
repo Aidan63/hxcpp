@@ -2036,8 +2036,8 @@ void MarkAllocUnchecked(void *inPtr,hx::MarkContext *__inCtx)
    sAllocMarks++;
    #endif
 
-   size_t ptr_i = ((size_t)inPtr)-sizeof(int);
-   unsigned int flags =  *((unsigned int *)ptr_i);
+   uintptr_t ptr_i{ reinterpret_cast<uintptr_t>(inPtr) - sizeof(uint32_t) };
+   uint32_t flags{ *reinterpret_cast<uint32_t*>(ptr_i) };
 
    #ifdef HXCPP_GC_NURSERY
    if (!(flags & 0xff000000))
@@ -2050,24 +2050,26 @@ void MarkAllocUnchecked(void *inPtr,hx::MarkContext *__inCtx)
       }
       #endif
 
-      int size = flags & 0xffff;
+      uint16_t size{ static_cast<uint16_t>(flags & 0xffff) };
       // Size will be 0 for large allocs -> no need to mark block
       if (size)
       {
-         int start = (int)(ptr_i & IMMIX_BLOCK_OFFSET_MASK);
-         int startRow = start>>IMMIX_LINE_BITS;
-         int blockId = *(BlockIdType *)(ptr_i & IMMIX_BLOCK_BASE_MASK);
-         BlockDataInfo *info = (*gBlockInfo)[blockId];
+         size_t         start{ static_cast<size_t>(ptr_i & IMMIX_BLOCK_OFFSET_MASK) };
+         size_t         startRow{ start >> IMMIX_LINE_BITS };
+         size_t         endRow{ static_cast<size_t>(std::min((start + size + sizeof(int) + IMMIX_LINE_LEN - 1), size_t{ IMMIX_BLOCK_SIZE }) >> IMMIX_LINE_BITS) };
+         BlockIdType    blockId = *reinterpret_cast<BlockIdType*>(ptr_i & IMMIX_BLOCK_BASE_MASK);
+         BlockDataInfo* info = (*gBlockInfo)[blockId];
 
-         int endRow = (start + size + sizeof(int) + IMMIX_LINE_LEN-1)>>IMMIX_LINE_BITS;
-         *(unsigned int *)ptr_i = flags = (flags & IMMIX_HEADER_PRESERVE) |
-                                          (endRow -startRow) |
-                                          (size<<IMMIX_ALLOC_SIZE_SHIFT) |
-                                          gMarkID;
+         *reinterpret_cast<uint32_t*>(ptr_i) =
+             flags =
+                (flags & IMMIX_HEADER_PRESERVE) |
+                static_cast<uint32_t>(endRow - startRow) |
+                static_cast<uint32_t>(size << IMMIX_ALLOC_SIZE_SHIFT) |
+                gMarkID;
 
-         unsigned int *pos = info->allocStart + startRow;
-         unsigned int val = *pos;
-         while(_hx_atomic_compare_exchange((volatile int *)pos, val,val|gImmixStartFlag[start&127]) != val)
+         uint32_t* pos{ info->allocStart + startRow };
+         uint32_t  val{ *pos };
+         while (_hx_atomic_compare_exchange(reinterpret_cast<volatile int*>(pos), static_cast<int>(val), static_cast<int>(val | gImmixStartFlag[start & 127])) != val)
             val = *pos;
 
          #ifdef HXCPP_GC_GENERATIONAL
@@ -2077,7 +2079,7 @@ void MarkAllocUnchecked(void *inPtr,hx::MarkContext *__inCtx)
       else
       {
          // Large nursury object
-         ((unsigned char *)inPtr)[HX_ENDIAN_MARK_ID_BYTE] = gByteMarkID;
+         reinterpret_cast<unsigned char*>(inPtr)[HX_ENDIAN_MARK_ID_BYTE] = gByteMarkID;
       }
    }
    else
@@ -2090,18 +2092,18 @@ void MarkAllocUnchecked(void *inPtr,hx::MarkContext *__inCtx)
          DebuggerTrap();
       }
       #endif
-      ((unsigned char *)inPtr)[HX_ENDIAN_MARK_ID_BYTE] = gByteMarkID;
+      reinterpret_cast<unsigned char*>(inPtr)[HX_ENDIAN_MARK_ID_BYTE] = gByteMarkID;
    }
 
-   int rows = flags & IMMIX_ALLOC_ROW_COUNT;
+   uint8_t rows{ static_cast<uint8_t>(flags & IMMIX_ALLOC_ROW_COUNT) };
    if (rows)
    {
       #if HXCPP_GC_DEBUG_LEVEL>0
       if ( ((ptr_i & IMMIX_BLOCK_OFFSET_MASK)>>IMMIX_LINE_BITS) + rows > IMMIX_LINES) DebuggerTrap();
       #endif
 
-      char *block = (char *)(ptr_i & IMMIX_BLOCK_BASE_MASK);
-      char *rowMark = block + ((ptr_i & IMMIX_BLOCK_OFFSET_MASK)>>IMMIX_LINE_BITS);
+      char* block{ reinterpret_cast<char*>(ptr_i & IMMIX_BLOCK_BASE_MASK) };
+      char* rowMark{ block + ((ptr_i & IMMIX_BLOCK_OFFSET_MASK) >> IMMIX_LINE_BITS) };
       *rowMark = 1;
       if (rows>1)
       {
@@ -2124,8 +2126,9 @@ void MarkAllocUnchecked(void *inPtr,hx::MarkContext *__inCtx)
 
 void MarkObjectAllocUnchecked(hx::Object *inPtr,hx::MarkContext *__inCtx)
 {
-   size_t ptr_i = ((size_t)inPtr)-sizeof(int);
-   unsigned int flags =  *((unsigned int *)ptr_i);
+   uintptr_t ptr_i{ reinterpret_cast<uintptr_t>(inPtr) - sizeof(uint32_t) };
+   uint32_t flags{ *reinterpret_cast<uint32_t*>(ptr_i) };
+
    #ifdef HXCPP_GC_NURSERY
    if (!(flags & 0xff000000))
    {
@@ -2137,23 +2140,25 @@ void MarkObjectAllocUnchecked(hx::Object *inPtr,hx::MarkContext *__inCtx)
          }
       #endif
 
+      uint16_t       size{ static_cast<uint16_t>(flags & 0xffff) };
+      size_t         start{ static_cast<size_t>(ptr_i & IMMIX_BLOCK_OFFSET_MASK) };
+      size_t         startRow{ start >> IMMIX_LINE_BITS };
+      size_t         endRow{ static_cast<size_t>(std::min((start + size + sizeof(int) + IMMIX_LINE_LEN - 1), size_t{ IMMIX_BLOCK_SIZE }) >> IMMIX_LINE_BITS) };
+      BlockIdType    blockId = *reinterpret_cast<BlockIdType*>(ptr_i & IMMIX_BLOCK_BASE_MASK);
+      BlockDataInfo* info = (*gBlockInfo)[blockId];
 
-      int size = flags & 0xffff;
-      int start = (int)(ptr_i & IMMIX_BLOCK_OFFSET_MASK);
-      int startRow = start>>IMMIX_LINE_BITS;
-      int blockId = *(BlockIdType *)(ptr_i & IMMIX_BLOCK_BASE_MASK);
-      BlockDataInfo *info = (*gBlockInfo)[blockId];
+      *reinterpret_cast<uint32_t*>(ptr_i) =
+          flags =
+              (flags & IMMIX_HEADER_PRESERVE) |
+              static_cast<uint32_t>(endRow - startRow) |
+              static_cast<uint32_t>(size << IMMIX_ALLOC_SIZE_SHIFT) |
+              gMarkID;
 
-      int endRow = (start + size + sizeof(int) + IMMIX_LINE_LEN-1)>>IMMIX_LINE_BITS;
-      *(unsigned int *)ptr_i = flags = (flags & IMMIX_HEADER_PRESERVE) |
-                                       (endRow -startRow) |
-                                       (size<<IMMIX_ALLOC_SIZE_SHIFT) |
-                                       gMarkID;
-
-      unsigned int *pos = info->allocStart + startRow;
-      unsigned int val = *pos;
-      while(_hx_atomic_compare_exchange( (volatile int *)pos, val, val|gImmixStartFlag[start&127]) != val)
+      uint32_t* pos{ info->allocStart + startRow };
+      uint32_t  val{ *pos };
+      while (_hx_atomic_compare_exchange(reinterpret_cast<volatile int*>(pos), static_cast<int>(val), static_cast<int>(val | gImmixStartFlag[start & 127])) != val)
          val = *pos;
+
       #ifdef HXCPP_GC_GENERATIONAL
       info->mHasSurvivor = true;
       #endif
@@ -2162,11 +2167,11 @@ void MarkObjectAllocUnchecked(hx::Object *inPtr,hx::MarkContext *__inCtx)
    #endif
       ((unsigned char *)inPtr)[HX_ENDIAN_MARK_ID_BYTE] = gByteMarkID;
 
-   int rows = flags & IMMIX_ALLOC_ROW_COUNT;
+   uint8_t rows{ static_cast<uint8_t>(flags & IMMIX_ALLOC_ROW_COUNT) };
    if (rows)
    {
-      char *block = (char *)(ptr_i & IMMIX_BLOCK_BASE_MASK);
-      char *rowMark = block + ((ptr_i & IMMIX_BLOCK_OFFSET_MASK)>>IMMIX_LINE_BITS);
+      char* block{ reinterpret_cast<char*>(ptr_i & IMMIX_BLOCK_BASE_MASK) };
+      char* rowMark{ block + ((ptr_i & IMMIX_BLOCK_OFFSET_MASK) >> IMMIX_LINE_BITS) };
       #if HXCPP_GC_DEBUG_LEVEL>0
       if ( ((ptr_i & IMMIX_BLOCK_OFFSET_MASK)>>IMMIX_LINE_BITS) + rows > IMMIX_LINES) DebuggerTrap();
       #endif
