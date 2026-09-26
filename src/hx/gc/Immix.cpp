@@ -2049,8 +2049,8 @@ void MarkAllocUnchecked(void *inPtr,hx::MarkContext *__inCtx)
       // Size will be 0 for large allocs -> no need to mark block
       if (size)
       {
-         size_t         start{ static_cast<uint16_t>(ptr_i & IMMIX_BLOCK_OFFSET_MASK) };
-         size_t         startRow = start >> IMMIX_LINE_BITS;
+         uint16_t       start{ static_cast<uint16_t>(ptr_i & IMMIX_BLOCK_OFFSET_MASK) };
+         uint8_t        startRow{ static_cast<uint8_t>(start >> IMMIX_LINE_BITS) };
          size_t         endRow = std::max(size_t{ IMMIX_LINES - 1 }, (sizeof(int) + start + size + IMMIX_LINE_LEN - 1) >> IMMIX_LINE_BITS);
          BlockIdType    blockId = *reinterpret_cast<BlockIdType*>(ptr_i & IMMIX_BLOCK_BASE_MASK);
          BlockDataInfo* info = (*gBlockInfo)[blockId];
@@ -2136,18 +2136,18 @@ void MarkObjectAllocUnchecked(hx::Object *inPtr,hx::MarkContext *__inCtx)
       #endif
 
       uint16_t       size{ static_cast<uint16_t>(flags & 0xffff) };
-      size_t         start{ static_cast<uint16_t>(ptr_i & IMMIX_BLOCK_OFFSET_MASK) };
-      size_t         startRow = start >> IMMIX_LINE_BITS;
+      uint16_t       start{ static_cast<uint16_t>(ptr_i & IMMIX_BLOCK_OFFSET_MASK) };
+      uint8_t        startRow{ static_cast<uint8_t>(start >> IMMIX_LINE_BITS) };
       size_t         endRow = std::max(size_t{ IMMIX_LINES - 1 }, (sizeof(int) + start + size + IMMIX_LINE_LEN - 1) >> IMMIX_LINE_BITS);
       BlockIdType    blockId = *reinterpret_cast<BlockIdType*>(ptr_i & IMMIX_BLOCK_BASE_MASK);
       BlockDataInfo* info = (*gBlockInfo)[blockId];
 
       *reinterpret_cast<uint32_t*>(ptr_i) =
           flags =
-          (flags & IMMIX_HEADER_PRESERVE) |
-          static_cast<uint32_t>(std::max(size_t{ 1 }, endRow - startRow)) |
-          static_cast<uint32_t>(size << IMMIX_ALLOC_SIZE_SHIFT) |
-          gMarkID;
+              (flags & IMMIX_HEADER_PRESERVE) |
+              static_cast<uint32_t>(std::max(size_t{ 1 }, endRow - startRow)) |
+              static_cast<uint32_t>(size << IMMIX_ALLOC_SIZE_SHIFT) |
+              gMarkID;
 
       uint32_t* pos{ info->allocStart + startRow };
       uint32_t  val{ *pos };
