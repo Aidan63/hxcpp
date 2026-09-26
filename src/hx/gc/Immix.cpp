@@ -2049,16 +2049,16 @@ void MarkAllocUnchecked(void *inPtr,hx::MarkContext *__inCtx)
       // Size will be 0 for large allocs -> no need to mark block
       if (size)
       {
-         uint16_t       start{ static_cast<uint16_t>(ptr_i & IMMIX_BLOCK_OFFSET_MASK) };
-         uint8_t        startRow{ static_cast<uint8_t>(start >> IMMIX_LINE_BITS) };
-         uint8_t        endRow{ static_cast<uint8_t>(std::min((sizeof(int) + start + size + IMMIX_LINE_LEN - 1) >> IMMIX_LINE_BITS, size_t{ IMMIX_BLOCK_SIZE - 1 })) };
+         size_t         start{ static_cast<uint16_t>(ptr_i & IMMIX_BLOCK_OFFSET_MASK) };
+         size_t         startRow = start >> IMMIX_LINE_BITS;
+         size_t         endRow = std::max(size_t{ IMMIX_LINES - 1 }, (sizeof(int) + start + size + IMMIX_LINE_LEN - 1) >> IMMIX_LINE_BITS);
          BlockIdType    blockId = *reinterpret_cast<BlockIdType*>(ptr_i & IMMIX_BLOCK_BASE_MASK);
          BlockDataInfo* info = (*gBlockInfo)[blockId];
 
          *reinterpret_cast<uint32_t*>(ptr_i) =
              flags =
                 (flags & IMMIX_HEADER_PRESERVE) |
-                std::max(uint8_t{ 1 }, static_cast<uint8_t>(endRow - startRow)) |
+                static_cast<uint32_t>(std::max(size_t{ 1 }, endRow - startRow)) |
                 static_cast<uint32_t>(size << IMMIX_ALLOC_SIZE_SHIFT) |
                 gMarkID;
 
@@ -2136,16 +2136,16 @@ void MarkObjectAllocUnchecked(hx::Object *inPtr,hx::MarkContext *__inCtx)
       #endif
 
       uint16_t       size{ static_cast<uint16_t>(flags & 0xffff) };
-      uint16_t       start{ static_cast<uint16_t>(ptr_i & IMMIX_BLOCK_OFFSET_MASK) };
-      uint8_t        startRow{ static_cast<uint8_t>(start >> IMMIX_LINE_BITS) };
-      uint8_t        endRow{ static_cast<uint8_t>(std::min((sizeof(int) + start + size + IMMIX_LINE_LEN - 1) >> IMMIX_LINE_BITS, size_t{ IMMIX_BLOCK_SIZE - 1 })) };
+      size_t         start{ static_cast<uint16_t>(ptr_i & IMMIX_BLOCK_OFFSET_MASK) };
+      size_t         startRow = start >> IMMIX_LINE_BITS;
+      size_t         endRow = std::max(size_t{ IMMIX_LINES - 1 }, (sizeof(int) + start + size + IMMIX_LINE_LEN - 1) >> IMMIX_LINE_BITS);
       BlockIdType    blockId = *reinterpret_cast<BlockIdType*>(ptr_i & IMMIX_BLOCK_BASE_MASK);
       BlockDataInfo* info = (*gBlockInfo)[blockId];
 
       *reinterpret_cast<uint32_t*>(ptr_i) =
           flags =
           (flags & IMMIX_HEADER_PRESERVE) |
-          std::max(uint8_t{ 1 }, static_cast<uint8_t>(endRow - startRow)) |
+          static_cast<uint32_t>(std::max(size_t{ 1 }, endRow - startRow)) |
           static_cast<uint32_t>(size << IMMIX_ALLOC_SIZE_SHIFT) |
           gMarkID;
 
@@ -3815,10 +3815,10 @@ public:
 
                         int end = destPos + allocSize;
 
-                        int headerEnd = std::min((end + (IMMIX_LINE_LEN - 1)) >> IMMIX_LINE_BITS, IMMIX_BLOCK_SIZE - 1);
+                        int headerEnd = (end + (IMMIX_LINE_LEN - 1)) >> IMMIX_LINE_BITS;
 
                         *buffer++ =
-                            std::min(1, headerEnd - startRow) |
+                            (headerEnd - startRow) |
                             (size<<IMMIX_ALLOC_SIZE_SHIFT) |
                             headerPreserve |
                             hx::gMarkID;
@@ -4027,7 +4027,7 @@ public:
                            unsigned int headerPreserve = header & IMMIX_HEADER_PRESERVE;
 
                            int end = destPos + allocSize;
-                           int headerEnd = std::min((end + (IMMIX_LINE_LEN - 1)) >> IMMIX_LINE_BITS, IMMIX_BLOCK_SIZE - 1);
+                           int headerEnd = (end + (IMMIX_LINE_LEN - 1)) >> IMMIX_LINE_BITS;
 
                            *buffer++ = 
                                (headerEnd - startRow) |
